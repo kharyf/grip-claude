@@ -42,6 +42,16 @@
         "projectId": "527f9dcd-373b-4c25-a559-95c0ea8cdda5"
       }
     },
-    "owner": "kharyf"
+    "owner": "kharyf",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.5"
+          }
+        }
+      ]
+    ]
   }
 }

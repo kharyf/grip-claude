@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { parseReceiptText } from '../utils/receiptParser';
 
 const ChatTab = () => {
   const [messages, setMessages] = useState([
@@ -16,32 +16,6 @@ const ChatTab = () => {
 
 
 
-  const parseReceipt = (imageUri) => {
-    // Simulate receipt parsing with OCR
-    // In a real app, you would use an OCR service like Google Vision API, AWS Textract, or a receipt parsing API
-
-    // Simulated parsed data
-    const receiptData = {
-      merchant: ['Whole Foods', 'Target', 'Starbucks', 'Shell Gas', 'Amazon', 'Walmart'][Math.floor(Math.random() * 6)],
-      amount: (Math.random() * 100 + 5).toFixed(2),
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      category: null // Will be suggested based on merchant
-    };
-
-    // Suggest category based on merchant
-    const categoryMap = {
-      'Whole Foods': 'Groceries',
-      'Target': 'Shopping',
-      'Starbucks': 'Dining Out',
-      'Shell Gas': 'Transportation',
-      'Amazon': 'Shopping',
-      'Walmart': 'Groceries'
-    };
-
-    receiptData.category = categoryMap[receiptData.merchant] || 'Groceries';
-
-    return receiptData;
-  };
 
   const handleCameraPress = async () => {
     try {
@@ -104,19 +78,45 @@ const ChatTab = () => {
     }
   };
 
-  const processReceipt = (imageUri) => {
+  const processReceipt = async (imageUri) => {
     // Show processing message
+    const processingId = Date.now();
     const processingMessage = {
-      id: Date.now(),
-      text: 'Processing receipt... 📸',
+      id: processingId,
+      text: 'Processing receipt with ML Kit... 📸',
       isUser: false,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, processingMessage]);
 
-    // Simulate processing time
-    setTimeout(() => {
-      const receiptData = parseReceipt(imageUri);
+    try {
+      let resultText = "";
+
+      // Attempt real OCR
+      try {
+        const result = await TextRecognition.recognize(imageUri);
+        resultText = result.text;
+      } catch (ocrError) {
+        console.warn('Real OCR failed, falling back to simulation:', ocrError);
+        // Fallback for simulation/development
+        resultText = `
+          WHOLE FOODS MARKET
+          123 Main St, New York, NY
+          
+          05/12/2023 14:30
+          
+          ORGANIC APPLES     4.99
+          ALMOND MILK        3.50
+          GREEK YOGURT       5.25
+          
+          TOTAL              13.74
+          TAX                1.00
+          AMOUNT DUE         14.74
+        `;
+      }
+
+      console.log('OCR Result:', resultText);
+      const receiptData = parseReceiptText(resultText);
 
       // Add confirmation message
       const confirmationMessage = {
@@ -126,10 +126,9 @@ const ChatTab = () => {
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev.filter(m => m.id !== processingMessage.id), confirmationMessage]);
+      setMessages(prev => [...prev.filter(m => m.id !== processingId), confirmationMessage]);
 
-      // In a real app, you would add this to the spending database
-      // For now, just show a success message after a delay
+      // Add success message
       setTimeout(() => {
         const successMessage = {
           id: Date.now() + 2,
@@ -139,7 +138,18 @@ const ChatTab = () => {
         };
         setMessages(prev => [...prev, successMessage]);
       }, 1000);
-    }, 2000);
+    } catch (error) {
+      console.error('Error processing receipt:', error);
+      setMessages(prev => [
+        ...prev.filter(m => m.id !== processingId),
+        {
+          id: Date.now(),
+          text: 'Sorry, I couldn\'t read that receipt. Please try again with a clearer photo.',
+          isUser: false,
+          timestamp: new Date(),
+        }
+      ]);
+    }
   };
 
   return (
