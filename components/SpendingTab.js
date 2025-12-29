@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 
 const SpendingTab = ({ chartType = 'Pie' }) => {
@@ -81,6 +82,44 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
   const [editItemName, setEditItemName] = useState('');
   const [editItemDate, setEditItemDate] = useState('');
   const [editItemAmount, setEditItemAmount] = useState('');
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // Load data from AsyncStorage on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
+        const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+
+        if (savedCategoryItems !== null) {
+          setCategoryItems(JSON.parse(savedCategoryItems));
+        }
+        if (savedCustomCategories !== null) {
+          setCustomCategories(JSON.parse(savedCustomCategories));
+        }
+      } catch (error) {
+        console.error('Failed to load spending data:', error);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Save data to AsyncStorage whenever it changes
+  useEffect(() => {
+    if (!isDataLoaded) return;
+
+    const saveData = async () => {
+      try {
+        await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
+        await AsyncStorage.setItem('customCategories', JSON.stringify(customCategories));
+      } catch (error) {
+        console.error('Failed to save spending data:', error);
+      }
+    };
+    saveData();
+  }, [categoryItems, customCategories, isDataLoaded]);
 
   const baseSpendingData = [
     {
@@ -208,7 +247,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
     if (displayName.length > 12) {
       displayName = displayName.substring(0, 12) + '...';
     }
-    
+
     return {
       ...item,
       name: displayName,
@@ -272,7 +311,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
       const monthStr = monthDayMatch[1];
       const day = parseInt(monthDayMatch[2]);
       const year = monthDayMatch[3] ? parseInt(monthDayMatch[3]) : new Date().getFullYear();
-      
+
       // Try to parse the month
       const monthMap = {
         'jan': 0, 'january': 0,
@@ -288,7 +327,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
         'nov': 10, 'november': 10,
         'dec': 11, 'december': 11
       };
-      
+
       const month = monthMap[monthStr.toLowerCase()];
       if (month !== undefined && day >= 1 && day <= 31) {
         parsedDate = new Date(year, month, day);
@@ -301,14 +340,14 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
       const month = parseInt(numericMatch[1]) - 1; // months are 0-indexed
       const day = parseInt(numericMatch[2]);
       let year = new Date().getFullYear();
-      
+
       if (numericMatch[4]) {
         year = parseInt(numericMatch[4]);
         if (year < 100) {
           year += 2000; // Convert 2-digit year to 4-digit
         }
       }
-      
+
       if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
         parsedDate = new Date(year, month, day);
       }
@@ -320,7 +359,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
       const year = parseInt(isoMatch[1]);
       const month = parseInt(isoMatch[2]) - 1;
       const day = parseInt(isoMatch[3]);
-      
+
       if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
         parsedDate = new Date(year, month, day);
       }
@@ -408,7 +447,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
       ...prev,
       [category]: (prev[category] || []).filter(item => item.id !== itemId),
     }));
-    
+
     // If this was the last item, close the modal
     const currentItems = getItemizedData(category);
     if (currentItems.length === 1) {
@@ -418,16 +457,16 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
 
   const openEditItemModal = (category, item) => {
     console.log('Opening edit modal for:', category, item);
-    
+
     // Close the itemized breakdown modal first
     setModalVisible(false);
-    
+
     // Set edit values
     setItemToEdit({ category, item });
     setEditItemName(item.name);
     setEditItemDate(item.date);
     setEditItemAmount(item.amount.toString());
-    
+
     // Small delay to ensure first modal is closed before opening edit modal
     setTimeout(() => {
       setEditItemModalVisible(true);
@@ -441,7 +480,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
     setEditItemName('');
     setEditItemDate('');
     setEditItemAmount('');
-    
+
     // Reopen the itemized breakdown modal after a small delay
     setTimeout(() => {
       setModalVisible(true);
@@ -451,7 +490,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
   const handleEditItem = () => {
     console.log('handleEditItem called');
     console.log('Edit values:', { editItemName, editItemDate, editItemAmount });
-    
+
     if (!editItemName.trim() || !editItemAmount.trim()) {
       console.log('Validation failed - missing name or amount');
       return;
@@ -474,26 +513,26 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
     if (itemToEdit) {
       const { category, item } = itemToEdit;
       console.log('Updating item:', item.id, 'in category:', category);
-      
+
       // Update the item in the category
       setCategoryItems(prev => ({
         ...prev,
-        [category]: (prev[category] || []).map(i => 
-          i.id === item.id 
+        [category]: (prev[category] || []).map(i =>
+          i.id === item.id
             ? { ...i, name: editItemName, date: formattedDate, amount: amount }
             : i
         ),
       }));
 
       console.log('Item updated, closing modal');
-      
+
       // Close edit modal
       setEditItemModalVisible(false);
       setItemToEdit(null);
       setEditItemName('');
       setEditItemDate('');
       setEditItemAmount('');
-      
+
       // Reopen the itemized breakdown modal to show updated values
       setTimeout(() => {
         setModalVisible(true);
@@ -507,315 +546,315 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
     <View style={styles.wrapper}>
       <View style={styles.backgroundPattern} />
       <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Overview</Text>
-        <Text style={styles.totalText}>Total: ${totalSpending.toLocaleString()}</Text>
-      </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Gripah</Text>
+          <Text style={styles.totalText}>Total: ${totalSpending.toLocaleString()}</Text>
+        </View>
 
-      <View style={styles.chartContainer}>
-        {chartType === 'Pie' && (
-          <PieChart
-            data={dataWithPercentage}
-            width={Dimensions.get('window').width - 40}
-            height={240}
-            chartConfig={chartConfig}
-            accessor="amount"
-            backgroundColor="transparent"
-            paddingLeft="15"
-            center={[10, 0]}
-          />
-        )}
-        {chartType === 'Bar' && (
-          <BarChart
-            data={{
-              labels: sortedSpendingData.slice(0, 8).map(item => {
-                const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
-                return name;
-              }),
-              datasets: [{
-                data: sortedSpendingData.slice(0, 8).map(item => item.amount)
-              }]
-            }}
-            width={Dimensions.get('window').width - 40}
-            height={240}
-            chartConfig={{
-              ...chartConfig,
-              barPercentage: 0.7,
-              decimalPlaces: 0,
-            }}
-            style={{
-              borderRadius: 16,
-            }}
-            fromZero
-            showValuesOnTopOfBars
-          />
-        )}
-        {chartType === 'Line' && (
-          <LineChart
-            data={{
-              labels: sortedSpendingData.slice(0, 8).map(item => {
-                const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
-                return name;
-              }),
-              datasets: [{
-                data: sortedSpendingData.slice(0, 8).map(item => item.amount)
-              }]
-            }}
-            width={Dimensions.get('window').width - 40}
-            height={240}
-            chartConfig={{
-              ...chartConfig,
-              decimalPlaces: 0,
-            }}
-            style={{
-              borderRadius: 16,
-            }}
-            bezier
-          />
-        )}
-        {chartType === 'Donut' && (
-          <PieChart
-            data={dataWithPercentage}
-            width={Dimensions.get('window').width - 40}
-            height={240}
-            chartConfig={chartConfig}
-            accessor="amount"
-            backgroundColor="transparent"
-            paddingLeft="15"
-            center={[10, 0]}
-            hasLegend={true}
-            absolute={false}
-          />
-        )}
-      </View>
+        <View style={styles.chartContainer}>
+          {chartType === 'Pie' && (
+            <PieChart
+              data={dataWithPercentage}
+              width={Dimensions.get('window').width - 40}
+              height={240}
+              chartConfig={chartConfig}
+              accessor="amount"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              center={[10, 0]}
+            />
+          )}
+          {chartType === 'Bar' && (
+            <BarChart
+              data={{
+                labels: sortedSpendingData.slice(0, 8).map(item => {
+                  const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
+                  return name;
+                }),
+                datasets: [{
+                  data: sortedSpendingData.slice(0, 8).map(item => item.amount)
+                }]
+              }}
+              width={Dimensions.get('window').width - 40}
+              height={240}
+              chartConfig={{
+                ...chartConfig,
+                barPercentage: 0.7,
+                decimalPlaces: 0,
+              }}
+              style={{
+                borderRadius: 16,
+              }}
+              fromZero
+              showValuesOnTopOfBars
+            />
+          )}
+          {chartType === 'Line' && (
+            <LineChart
+              data={{
+                labels: sortedSpendingData.slice(0, 8).map(item => {
+                  const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
+                  return name;
+                }),
+                datasets: [{
+                  data: sortedSpendingData.slice(0, 8).map(item => item.amount)
+                }]
+              }}
+              width={Dimensions.get('window').width - 40}
+              height={240}
+              chartConfig={{
+                ...chartConfig,
+                decimalPlaces: 0,
+              }}
+              style={{
+                borderRadius: 16,
+              }}
+              bezier
+            />
+          )}
+          {chartType === 'Donut' && (
+            <PieChart
+              data={dataWithPercentage}
+              width={Dimensions.get('window').width - 40}
+              height={240}
+              chartConfig={chartConfig}
+              accessor="amount"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              center={[10, 0]}
+              hasLegend={true}
+              absolute={false}
+            />
+          )}
+        </View>
 
-      <View style={styles.legendContainer}>
-        {sortedSpendingData.map((item, index) => (
-          <View key={index} style={styles.legendItemContainer}>
-            <TouchableOpacity 
-              style={styles.legendItem}
-              onPress={() => handleCategoryPress(item.name)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.colorBox, { backgroundColor: item.color }]} />
-              <Text style={styles.legendText} numberOfLines={1} ellipsizeMode="tail">
-                {item.name}
-              </Text>
-              <Text style={styles.amountText}>${item.amount}</Text>
-              <Text style={styles.arrowText}>›</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => openAddItemModal(item.name)}
-            >
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
-
-      {/* Add Category Button */}
-      <View style={styles.addCategoryButtonContainer}>
-        <TouchableOpacity 
-          style={styles.addCategoryButton}
-          onPress={openAddCategoryModal}
-        >
-          <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Modal for itemized breakdown */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedCategory} - Itemized Breakdown
-              </Text>
-              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {selectedCategory && getItemizedData(selectedCategory).map((item, index) => (
-                <View key={index} style={styles.itemRow}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemDate}>{item.date}</Text>
-                  </View>
-                  <Text style={styles.itemAmount}>${item.amount}</Text>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => openEditItemModal(selectedCategory, item)}
-                  >
-                    <Text style={styles.editButtonText}>✎</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveItem(selectedCategory, item.id)}
-                  >
-                    <Text style={styles.removeButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalAmount}>
-                  ${selectedCategory && (sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
+        <View style={styles.legendContainer}>
+          {sortedSpendingData.map((item, index) => (
+            <View key={index} style={styles.legendItemContainer}>
+              <TouchableOpacity
+                style={styles.legendItem}
+                onPress={() => handleCategoryPress(item.name)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.colorBox, { backgroundColor: item.color }]} />
+                <Text style={styles.legendText} numberOfLines={1} ellipsizeMode="tail">
+                  {item.name}
                 </Text>
+                <Text style={styles.amountText}>${item.amount}</Text>
+                <Text style={styles.arrowText}>›</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => openAddItemModal(item.name)}
+              >
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
+        {/* Add Category Button */}
+        <View style={styles.addCategoryButtonContainer}>
+          <TouchableOpacity
+            style={styles.addCategoryButton}
+            onPress={openAddCategoryModal}
+          >
+            <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal for itemized breakdown */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {selectedCategory} - Itemized Breakdown
+                </Text>
+                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
-      {/* Add Item Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={addItemModalVisible}
-        onRequestClose={closeAddItemModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.addItemModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Item to {selectedCategory}</Text>
-              <TouchableOpacity onPress={closeAddItemModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+              <ScrollView style={styles.modalBody}>
+                {selectedCategory && getItemizedData(selectedCategory).map((item, index) => (
+                  <View key={index} style={styles.itemRow}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemDate}>{item.date}</Text>
+                    </View>
+                    <Text style={styles.itemAmount}>${item.amount}</Text>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => openEditItemModal(selectedCategory, item)}
+                    >
+                      <Text style={styles.editButtonText}>✎</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveItem(selectedCategory, item.id)}
+                    >
+                      <Text style={styles.removeButtonText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
 
-            <View style={styles.addItemForm}>
-              <Text style={styles.inputLabel}>Item Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={newItemName}
-                onChangeText={setNewItemName}
-                placeholder="e.g., Whole Foods"
-                placeholderTextColor="#666"
-              />
-
-              <Text style={styles.inputLabel}>Date (optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={newItemDate}
-                onChangeText={setNewItemDate}
-                placeholder="e.g., Dec 25, 2024 or 12/25/2024"
-                placeholderTextColor="#666"
-              />
-
-              <Text style={styles.inputLabel}>Amount *</Text>
-              <TextInput
-                style={styles.input}
-                value={newItemAmount}
-                onChangeText={setNewItemAmount}
-                placeholder="e.g., 45.50"
-                placeholderTextColor="#666"
-                keyboardType="decimal-pad"
-              />
-
-              <TouchableOpacity style={styles.submitButton} onPress={handleAddItem}>
-                <Text style={styles.submitButtonText}>Add Item</Text>
-              </TouchableOpacity>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalAmount}>
+                    ${selectedCategory && (sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
+                  </Text>
+                </View>
+              </ScrollView>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Add Category Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={addCategoryModalVisible}
-        onRequestClose={closeAddCategoryModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.addItemModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Category</Text>
-              <TouchableOpacity onPress={closeAddCategoryModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Add Item Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={addItemModalVisible}
+          onRequestClose={closeAddItemModal}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.addItemModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Item to {selectedCategory}</Text>
+                <TouchableOpacity onPress={closeAddItemModal} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.addItemForm}>
-              <Text style={styles.inputLabel}>Category Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-                placeholder="e.g., Travel, Hobbies, Gifts"
-                placeholderTextColor="#666"
-              />
+              <View style={styles.addItemForm}>
+                <Text style={styles.inputLabel}>Item Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newItemName}
+                  onChangeText={setNewItemName}
+                  placeholder="e.g., Whole Foods"
+                  placeholderTextColor="#666"
+                />
 
-              <TouchableOpacity style={styles.submitButton} onPress={handleAddCategory}>
-                <Text style={styles.submitButtonText}>Add Category</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+                <Text style={styles.inputLabel}>Date (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newItemDate}
+                  onChangeText={setNewItemDate}
+                  placeholder="e.g., Dec 25, 2024 or 12/25/2024"
+                  placeholderTextColor="#666"
+                />
 
-      {/* Edit Item Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={editItemModalVisible}
-        onRequestClose={closeEditItemModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.addItemModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Item</Text>
-              <TouchableOpacity onPress={closeEditItemModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+                <Text style={styles.inputLabel}>Amount *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newItemAmount}
+                  onChangeText={setNewItemAmount}
+                  placeholder="e.g., 45.50"
+                  placeholderTextColor="#666"
+                  keyboardType="decimal-pad"
+                />
 
-            <View style={styles.addItemForm}>
-              <Text style={styles.inputLabel}>Item Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={editItemName}
-                onChangeText={setEditItemName}
-                placeholder="e.g., Whole Foods"
-                placeholderTextColor="#666"
-              />
-
-              <Text style={styles.inputLabel}>Date</Text>
-              <TextInput
-                style={styles.input}
-                value={editItemDate}
-                onChangeText={setEditItemDate}
-                placeholder="e.g., Dec 25, 2024 or 12/25/2024"
-                placeholderTextColor="#666"
-              />
-
-              <Text style={styles.inputLabel}>Amount *</Text>
-              <TextInput
-                style={styles.input}
-                value={editItemAmount}
-                onChangeText={setEditItemAmount}
-                placeholder="e.g., 45.50"
-                placeholderTextColor="#666"
-                keyboardType="decimal-pad"
-              />
-
-              <TouchableOpacity style={styles.submitButton} onPress={handleEditItem}>
-                <Text style={styles.submitButtonText}>Save Changes</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.submitButton} onPress={handleAddItem}>
+                  <Text style={styles.submitButtonText}>Add Item</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+
+        {/* Add Category Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={addCategoryModalVisible}
+          onRequestClose={closeAddCategoryModal}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.addItemModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Category</Text>
+                <TouchableOpacity onPress={closeAddCategoryModal} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.addItemForm}>
+                <Text style={styles.inputLabel}>Category Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                  placeholder="e.g., Travel, Hobbies, Gifts"
+                  placeholderTextColor="#666"
+                />
+
+                <TouchableOpacity style={styles.submitButton} onPress={handleAddCategory}>
+                  <Text style={styles.submitButtonText}>Add Category</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Edit Item Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={editItemModalVisible}
+          onRequestClose={closeEditItemModal}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.addItemModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Item</Text>
+                <TouchableOpacity onPress={closeEditItemModal} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.addItemForm}>
+                <Text style={styles.inputLabel}>Item Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editItemName}
+                  onChangeText={setEditItemName}
+                  placeholder="e.g., Whole Foods"
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={styles.inputLabel}>Date</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editItemDate}
+                  onChangeText={setEditItemDate}
+                  placeholder="e.g., Dec 25, 2024 or 12/25/2024"
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={styles.inputLabel}>Amount *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editItemAmount}
+                  onChangeText={setEditItemAmount}
+                  placeholder="e.g., 45.50"
+                  placeholderTextColor="#666"
+                  keyboardType="decimal-pad"
+                />
+
+                <TouchableOpacity style={styles.submitButton} onPress={handleEditItem}>
+                  <Text style={styles.submitButtonText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
     </View>
   );
 };

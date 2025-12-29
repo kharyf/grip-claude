@@ -1,6 +1,6 @@
-# Docker Setup for FinanceApp
+# Docker Setup for Gripah
 
-This document provides instructions for building and running the FinanceApp using Docker.
+This document provides instructions for building and running the Gripah using Docker.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This document provides instructions for building and running the FinanceApp usin
 To build the Docker image, run the following command from the project root:
 
 ```bash
-docker build -t finance-app .
+docker build -t gripah .
 ```
 
 This will:
@@ -26,7 +26,7 @@ This will:
 To run the container:
 
 ```bash
-docker run -p 3000:3000 finance-app
+docker run -p 3000:3000 gripah
 ```
 
 The application will be accessible at `http://localhost:3000`
@@ -36,7 +36,7 @@ The application will be accessible at `http://localhost:3000`
 To run the container in the background:
 
 ```bash
-docker run -d -p 3000:3000 --name finance-app-container finance-app
+docker run -d -p 3000:3000 --name gripah-container gripah
 ```
 
 ### Custom Port Mapping
@@ -44,7 +44,7 @@ docker run -d -p 3000:3000 --name finance-app-container finance-app
 To run the app on a different port (e.g., 8080):
 
 ```bash
-docker run -p 8080:3000 finance-app
+docker run -p 8080:3000 gripah
 ```
 
 Then access the app at `http://localhost:8080`
@@ -58,22 +58,22 @@ docker ps
 
 ### Stop the container
 ```bash
-docker stop finance-app-container
+docker stop gripah-container
 ```
 
 ### Start the container again
 ```bash
-docker start finance-app-container
+docker start gripah-container
 ```
 
 ### Remove the container
 ```bash
-docker rm finance-app-container
+docker rm gripah-container
 ```
 
 ### View container logs
 ```bash
-docker logs finance-app-container
+docker logs gripah-container
 ```
 
 ## Docker Image Details
@@ -90,19 +90,19 @@ docker logs finance-app-container
 Try cleaning your local node_modules and rebuilding:
 ```bash
 rm -rf node_modules package-lock.json
-docker build --no-cache -t finance-app .
+docker build --no-cache -t gripah .
 ```
 
 ### Container won't start
 Check the logs:
 ```bash
-docker logs finance-app-container
+docker logs gripah-container
 ```
 
 ### Port already in use
 Either stop the service using port 3000 or use a different port mapping:
 ```bash
-docker run -p 3001:3000 finance-app
+docker run -p 3001:3000 gripah
 ```
 
 ## Files Included

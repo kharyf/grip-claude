@@ -37,7 +37,7 @@ export default function App() {
             <Text style={styles.userIconText}>👤</Text>
           </View>
         </TouchableOpacity>
-        <Text style={styles.appTitle}>Grip</Text>
+        <Text style={styles.appTitle}>Gripah</Text>
         <View style={styles.userIconPlaceholder} />
       </View>
       

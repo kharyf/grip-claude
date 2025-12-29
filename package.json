@@ -1,5 +1,5 @@
 {
-  "name": "financeapp_sdk54",
+  "name": "gripah",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "build": "expo export --platform web"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/slider": "5.0.1",
     "@react-native-picker/picker": "2.11.1",
     "expo": "~54.0.29",
@@ -17,12 +18,12 @@
     "expo-dev-client": "~6.0.20",
     "expo-image-picker": "^17.0.10",
     "expo-status-bar": "~3.0.9",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "react-native": "0.76.6",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
     "react-native-chart-kit": "^6.12.0",
     "react-native-svg": "15.12.1",
-    "react-native-web": "~0.19.10"
+    "react-native-web": "^0.21.0"
   },
   "private": true
 }

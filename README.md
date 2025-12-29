@@ -1,6 +1,6 @@
-# <span style="color: #32CD32;">Grip</span>
+# <span style="color: #32CD32;">Gripah</span>
 
-<h1 align="center" style="color: #32CD32;">💰 Grip</h1>
+<h1 align="center" style="color: #32CD32;">💰 Gripah</h1>
 
 <p align="center">
   <strong>Your Personal Finance Companion</strong><br>
@@ -11,7 +11,7 @@
 
 ## 📱 About
 
-**Grip** is a modern personal finance application built with React Native and Expo. It helps you track your spending, manage budgets, and get AI-powered financial insights - all in one intuitive mobile app.
+**Gripah** is a modern personal finance application built with React Native and Expo. It helps you track your spending, manage budgets, and get AI-powered financial insights - all in one intuitive mobile app.
 
 ## ✨ Features
 
@@ -53,7 +53,7 @@
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd grip
+   cd gripah
    ```
 
 2. **Install dependencies**
@@ -83,12 +83,12 @@
 ## 📦 Project Structure
 
 ```
-grip/
+gripah/
 ├── App.js                 # Main application component with tab navigation
 ├── components/
-│   ├── ChatTab.js        # AI chat interface
-│   ├── SpendingTab.js    # Spending tracker and analytics
-│   └── SettingsTab.js    # App settings and configuration
+├── ChatTab.js        # AI chat interface
+├── SpendingTab.js    # Spending tracker and analytics
+└── SettingsTab.js    # App settings and configuration
 ├── assets/               # Images, icons, and static resources
 ├── app.json             # Expo configuration
 └── package.json         # Dependencies and scripts

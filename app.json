@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FinanceApp_SDK54",
+    "name": "Gripah",
     "slug": "FinanceApp_SDK54",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loxodonta.grip-claude",
+      "bundleIdentifier": "com.loxodonta.gripah",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app needs access to your camera to scan receipts and automatically add spending items.",
@@ -27,7 +27,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.FinanceApp_SDK54",
+      "package": "com.anonymous.gripah",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -41,6 +41,7 @@
       "eas": {
         "projectId": "527f9dcd-373b-4c25-a559-95c0ea8cdda5"
       }
-    }
+    },
+    "owner": "kharyf"
   }
 }
