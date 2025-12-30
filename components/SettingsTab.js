@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
 
-const SettingsTab = ({ chartType, onChartTypeChange }) => {
+const SettingsTab = ({ currency, onCurrencyChange }) => {
   // Toggle settings
   const [notifications, setNotifications] = useState(true);
 
@@ -13,9 +13,7 @@ const SettingsTab = ({ chartType, onChartTypeChange }) => {
   const [chartRefreshRate, setChartRefreshRate] = useState(30);
   const [fontSize, setFontSize] = useState(16);
 
-  // Dropdown settings
-  const [currency, setCurrency] = useState('USD');
-  const [language, setLanguage] = useState('English');
+  // Options
   const [resetModalVisible, setResetModalVisible] = useState(false);
 
   const handleResetDatabase = async () => {
@@ -117,11 +115,16 @@ const SettingsTab = ({ chartType, onChartTypeChange }) => {
 
           {/* Dropdown 1: Currency */}
           <View style={styles.settingItem}>
+            <View style={styles.disclaimerContainer}>
+              <Text style={styles.disclaimerText}>
+                Note: Currency change is visual only; no exchange rate calculations are performed.
+              </Text>
+            </View>
             <Text style={styles.settingLabel}>Currency</Text>
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={currency}
-                onValueChange={setCurrency}
+                onValueChange={onCurrencyChange}
                 style={styles.picker}
                 dropdownIconColor="#32CD32"
               >
@@ -134,42 +137,7 @@ const SettingsTab = ({ chartType, onChartTypeChange }) => {
             </View>
           </View>
 
-          {/* Dropdown 2: Language */}
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Language</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={language}
-                onValueChange={setLanguage}
-                style={styles.picker}
-                dropdownIconColor="#32CD32"
-              >
-                <Picker.Item label="English" value="English" color="#32CD32" />
-                <Picker.Item label="Spanish" value="Spanish" color="#32CD32" />
-                <Picker.Item label="French" value="French" color="#32CD32" />
-                <Picker.Item label="German" value="German" color="#32CD32" />
-                <Picker.Item label="Japanese" value="Japanese" color="#32CD32" />
-              </Picker>
-            </View>
-          </View>
 
-          {/* Dropdown 3: Chart Type */}
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Current Chart Type</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={chartType}
-                onValueChange={onChartTypeChange}
-                style={styles.picker}
-                dropdownIconColor="#32CD32"
-              >
-                <Picker.Item label="Pie Chart" value="Pie" color="#32CD32" />
-                <Picker.Item label="Bar Chart" value="Bar" color="#32CD32" />
-                <Picker.Item label="Line Chart" value="Line" color="#32CD32" />
-                <Picker.Item label="Donut Chart" value="Donut" color="#32CD32" />
-              </Picker>
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -286,6 +254,20 @@ const styles = StyleSheet.create({
   picker: {
     color: '#32CD32',
     backgroundColor: 'transparent',
+  },
+  disclaimerContainer: {
+    backgroundColor: '#1a3a1a',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#32CD32',
+  },
+  disclaimerText: {
+    color: '#32CD32',
+    fontSize: 12,
+    opacity: 0.8,
+    fontStyle: 'italic',
   },
   resetButton: {
     backgroundColor: '#FF3B30',

@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 
-const SpendingTab = ({ chartType = 'Pie' }) => {
+const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Initialize with base items for all categories
   const getInitialCategoryItems = () => {
     const currentYear = new Date().getFullYear();
@@ -548,7 +548,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Gripah</Text>
-          <Text style={styles.totalText}>Total: ${totalSpending.toLocaleString()}</Text>
+          <Text style={styles.totalText}>Total: {currencySymbol}{totalSpending.toLocaleString()}</Text>
         </View>
 
         <View style={styles.chartContainer}>
@@ -640,7 +640,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
                 <Text style={styles.legendText} numberOfLines={1} ellipsizeMode="tail">
                   {item.name}
                 </Text>
-                <Text style={styles.amountText}>${item.amount}</Text>
+                <Text style={styles.amountText}>{currencySymbol}{item.amount}</Text>
                 <Text style={styles.arrowText}>›</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -688,7 +688,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
                       <Text style={styles.itemName}>{item.name}</Text>
                       <Text style={styles.itemDate}>{item.date}</Text>
                     </View>
-                    <Text style={styles.itemAmount}>${item.amount}</Text>
+                    <Text style={styles.itemAmount}>{currencySymbol}{item.amount}</Text>
                     <TouchableOpacity
                       style={styles.editButton}
                       onPress={() => openEditItemModal(selectedCategory, item)}
@@ -707,7 +707,7 @@ const SpendingTab = ({ chartType = 'Pie' }) => {
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total</Text>
                   <Text style={styles.totalAmount}>
-                    ${selectedCategory && (sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
+                    {currencySymbol}{selectedCategory && (sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
                   </Text>
                 </View>
               </ScrollView>

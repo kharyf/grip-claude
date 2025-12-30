@@ -1,8 +1,11 @@
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { parseReceiptText } from '../utils/receiptParser';
 
-const ChatTab = () => {
+const ChatTab = ({ currencySymbol = '$' }) => {
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -11,6 +14,45 @@ const ChatTab = () => {
       timestamp: new Date(),
     },
   ]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // Load scanner history on mount
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        const savedMessages = await AsyncStorage.getItem('scanner_messages');
+        if (savedMessages !== null) {
+          // Parse and convert strings back to Date objects for timestamps
+          const parsed = JSON.parse(savedMessages).map(m => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }));
+          setMessages(parsed);
+        }
+      } catch (error) {
+        console.error('Failed to load scanner history:', error);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    };
+    loadMessages();
+  }, []);
+
+  // Save scanner history whenever messages change
+  useEffect(() => {
+    if (!isDataLoaded) return;
+
+    const saveMessages = async () => {
+      try {
+        // Filter out temporary processing messages
+        const persistentMessages = messages.filter(m => !m.text.includes('Processing receipt'));
+        await AsyncStorage.setItem('scanner_messages', JSON.stringify(persistentMessages));
+      } catch (error) {
+        console.error('Failed to save scanner history:', error);
+      }
+    };
+    saveMessages();
+  }, [messages, isDataLoaded]);
 
 
 
@@ -118,26 +160,86 @@ const ChatTab = () => {
       console.log('OCR Result:', resultText);
       const receiptData = parseReceiptText(resultText);
 
-      // Add confirmation message
-      const confirmationMessage = {
-        id: Date.now() + 1,
-        text: `I found a receipt from ${receiptData.merchant} for $${receiptData.amount} on ${receiptData.date}. I'll add this to your ${receiptData.category} category.`,
-        isUser: false,
-        timestamp: new Date(),
-      };
+      // Show confirmation alert before adding to database
+      Alert.alert(
+        "Confirm Receipt Scan",
+        `Merchant: ${receiptData.merchant}\nAmount: ${currencySymbol}${receiptData.amount}\nDate: ${receiptData.date}\nCategory: ${receiptData.category}`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              setMessages(prev => [
+                ...prev.filter(m => m.id !== processingId),
+                {
+                  id: Date.now(),
+                  text: "Scan canceled. You can try scanning again if the data was incorrect.",
+                  isUser: false,
+                  timestamp: new Date(),
+                }
+              ]);
+            }
+          },
+          {
+            text: "Retake",
+            onPress: () => {
+              setMessages(prev => prev.filter(m => m.id !== processingId));
+              handleCameraPress(); // Call the main camera trigger again
+            }
+          },
+          {
+            text: "Add to Spending",
+            onPress: async () => {
+              try {
+                // 1. Get existing spending data
+                const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
+                let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
 
-      setMessages(prev => [...prev.filter(m => m.id !== processingId), confirmationMessage]);
+                // 2. Prepare the new item
+                const newItem = {
+                  id: Date.now(),
+                  name: receiptData.merchant,
+                  date: receiptData.date,
+                  amount: parseFloat(receiptData.amount),
+                  isBase: false,
+                };
 
-      // Add success message
-      setTimeout(() => {
-        const successMessage = {
-          id: Date.now() + 2,
-          text: `✅ Added $${receiptData.amount} to ${receiptData.category} for ${receiptData.merchant}. You can view it in the Spending tab!`,
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, successMessage]);
-      }, 1000);
+                // 3. Add to the correct category
+                const category = receiptData.category || 'Shopping'; // Fallback
+                categoryItems[category] = [...(categoryItems[category] || []), newItem];
+
+                // 4. Save back to AsyncStorage
+                await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
+
+                // 5. Add confirmation message to chat
+                const confirmationMessage = {
+                  id: Date.now() + 1,
+                  text: `I've confirmed the receipt from ${receiptData.merchant} for ${currencySymbol}${receiptData.amount}. Adding it now to ${receiptData.category}.`,
+                  isUser: false,
+                  timestamp: new Date(),
+                };
+
+                setMessages(prev => [...prev.filter(m => m.id !== processingId), confirmationMessage]);
+
+                // 6. Add success message
+                setTimeout(() => {
+                  const successMessage = {
+                    id: Date.now() + 2,
+                    text: `✅ Added ${currencySymbol}${receiptData.amount} to ${receiptData.category} for ${receiptData.merchant}. You can view it in the Spending tab!`,
+                    isUser: false,
+                    timestamp: new Date(),
+                  };
+                  setMessages(prev => [...prev, successMessage]);
+                }, 1000);
+              } catch (saveError) {
+                console.error('Failed to save to spending data:', saveError);
+                Alert.alert('Error', 'Failed to save to spending database.');
+              }
+            }
+          }
+        ],
+        { cancelable: false }
+      );
     } catch (error) {
       console.error('Error processing receipt:', error);
       setMessages(prev => [
@@ -150,6 +252,35 @@ const ChatTab = () => {
         }
       ]);
     }
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      "Clear History",
+      "Are you sure you want to clear your scan history?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('scanner_messages');
+              setMessages([
+                {
+                  id: 1,
+                  text: "Hello! I'm your AI assistant. Take a picture of your latest receipt and I'll add it to your database.",
+                  isUser: false,
+                  timestamp: new Date(),
+                },
+              ]);
+            } catch (error) {
+              console.error('Failed to clear scanner history:', error);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -186,6 +317,12 @@ const ChatTab = () => {
             onPress={handleCameraPress}
           >
             <Text style={styles.cameraButtonText}>📷</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={handleClearHistory}
+          >
+            <Text style={styles.clearButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -266,6 +403,24 @@ const styles = StyleSheet.create({
   },
   cameraButtonText: {
     fontSize: 48,
+  },
+  clearButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    right: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  clearButtonText: {
+    fontSize: 28,
   },
 });
 

@@ -1,35 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
+
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  CAD: 'C$',
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Spending');
   const [menuVisible, setMenuVisible] = useState(false);
   const [chartType, setChartType] = useState('Pie');
+  const [currency, setCurrency] = useState('USD');
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadCurrency = async () => {
+      try {
+        const savedCurrency = await AsyncStorage.getItem('currency');
+        if (savedCurrency) {
+          setCurrency(savedCurrency);
+        }
+      } catch (error) {
+        console.error('Failed to load currency:', error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadCurrency();
+  }, []);
+
+  const handleCurrencyChange = async (newCurrency) => {
+    setCurrency(newCurrency);
+    try {
+      await AsyncStorage.setItem('currency', newCurrency);
+    } catch (error) {
+      console.error('Failed to save currency:', error);
+    }
+  };
+
+  const currencySymbol = CURRENCY_SYMBOLS[currency] || '$';
 
   const renderContent = () => {
+    if (!isLoaded) return null;
+
     switch (activeTab) {
       case 'Spending':
-        return <SpendingTab chartType={chartType} />;
-      case 'Assistant':
-        return <ChatTab />;
+        return <SpendingTab chartType={chartType} currencySymbol={currencySymbol} />;
+      case 'Scanner':
+        return <ChatTab currencySymbol={currencySymbol} />;
       case 'Settings':
-        return <SettingsTab chartType={chartType} onChartTypeChange={setChartType} />;
+        return (
+          <SettingsTab
+            currency={currency}
+            onCurrencyChange={handleCurrencyChange}
+          />
+        );
       default:
-        return <SpendingTab chartType={chartType} />;
+        return <SpendingTab chartType={chartType} currencySymbol={currencySymbol} />;
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      
+
       {/* App Title */}
       <View style={styles.titleContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.userIconButton}
           onPress={() => setMenuVisible(true)}
         >
@@ -40,7 +85,7 @@ export default function App() {
         <Text style={styles.appTitle}>Gripah</Text>
         <View style={styles.userIconPlaceholder} />
       </View>
-      
+
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -51,16 +96,16 @@ export default function App() {
             Spending
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'Assistant' && styles.activeTab]}
-          onPress={() => setActiveTab('Assistant')}
+          style={[styles.tab, activeTab === 'Scanner' && styles.activeTab]}
+          onPress={() => setActiveTab('Scanner')}
         >
-          <Text style={[styles.tabText, activeTab === 'Assistant' && styles.activeTabText]}>
-            Assistant
+          <Text style={[styles.tabText, activeTab === 'Scanner' && styles.activeTabText]}>
+            Scanner
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.tab, activeTab === 'Settings' && styles.activeTab]}
           onPress={() => setActiveTab('Settings')}
@@ -83,13 +128,13 @@ export default function App() {
         visible={menuVisible}
         onRequestClose={() => setMenuVisible(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.menuContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
@@ -100,7 +145,7 @@ export default function App() {
               <Text style={styles.menuText}>View Profile</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
@@ -111,7 +156,7 @@ export default function App() {
               <Text style={styles.menuText}>Account Settings</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.menuItem, styles.menuItemLast]}
               onPress={() => {
                 setMenuVisible(false);
