@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { parseReceiptText } from '../utils/receiptParser';
+
+const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
+  requestNonPersonalizedAdsOnly: true,
+});
 
 const ChatTab = ({ currencySymbol = '$' }) => {
   const [messages, setMessages] = useState([
@@ -15,6 +20,43 @@ const ChatTab = ({ currencySymbol = '$' }) => {
     },
   ]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [adLoaded, setAdLoaded] = useState(false);
+  const pendingScanRef = useRef(false);
+
+  // Interstitial ad lifecycle
+  useEffect(() => {
+    const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+      setAdLoaded(true);
+    });
+
+    const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+      setAdLoaded(false);
+      interstitial.load(); // Reload for next time
+
+      // If user was waiting to scan, trigger it now
+      if (pendingScanRef.current) {
+        pendingScanRef.current = false;
+        showScanOptions();
+      }
+    });
+
+    const unsubscribeError = interstitial.addAdEventListener(AdEventType.ERROR, (error) => {
+      console.warn('Interstitial Load Error:', error);
+      if (pendingScanRef.current) {
+        pendingScanRef.current = false;
+        showScanOptions();
+      }
+    });
+
+    // Start loading the first ad
+    interstitial.load();
+
+    return () => {
+      unsubscribeLoaded();
+      unsubscribeClosed();
+      unsubscribeError();
+    };
+  }, []);
 
   // Load scanner history on mount
   useEffect(() => {
@@ -55,11 +97,7 @@ const ChatTab = ({ currencySymbol = '$' }) => {
   }, [messages, isDataLoaded]);
 
 
-
-
-
-
-  const handleCameraPress = async () => {
+  const showScanOptions = async () => {
     try {
       // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -108,15 +146,41 @@ const ChatTab = ({ currencySymbol = '$' }) => {
               }
             }
           },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
+          { text: 'Cancel', style: 'cancel' }
+        ],
+        { cancelable: true }
       );
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      console.error('Error showing scan options:', error);
       Alert.alert('Error', 'Failed to access camera. Please try again.');
+    }
+  };
+
+  const handleCameraPress = async () => {
+    if (adLoaded) {
+      pendingScanRef.current = true;
+      try {
+        await interstitial.show();
+      } catch (error) {
+        console.warn('Interstitial show failed:', error);
+        pendingScanRef.current = false;
+        showScanOptions();
+      }
+    } else {
+      // If not loaded yet, try to load and wait a split second
+      interstitial.load();
+      setTimeout(async () => {
+        if (interstitial.loaded) {
+          pendingScanRef.current = true;
+          try {
+            await interstitial.show();
+          } catch (e) {
+            showScanOptions();
+          }
+        } else {
+          showScanOptions();
+        }
+      }, 500);
     }
   };
 
@@ -191,11 +255,24 @@ const ChatTab = ({ currencySymbol = '$' }) => {
             text: "Add to Spending",
             onPress: async () => {
               try {
-                // 1. Get existing spending data
+                // 1. Get existing spending data and categories
                 const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
+                const savedCustomCategories = await AsyncStorage.getItem('customCategories');
                 let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
+                const customCategories = savedCustomCategories ? JSON.parse(savedCustomCategories) : [];
 
-                // 2. Prepare the new item
+                // 2. Prepare valid categories list
+                const baseCategories = ['Groceries', 'Rent', 'Utilities', 'Transportation', 'Entertainment', 'Dining Out', 'Healthcare', 'Vacation', 'Subscriptions', 'Savings'];
+                const allCategories = [...baseCategories, ...customCategories];
+
+                // 3. Validate category
+                let category = receiptData.category;
+                if (!allCategories.includes(category)) {
+                  console.log(`Scanner found non-existent category "${category}", falling back to Groceries.`);
+                  category = 'Groceries';
+                }
+
+                // 4. Prepare the new item
                 const newItem = {
                   id: Date.now(),
                   name: receiptData.merchant,
@@ -204,8 +281,7 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                   isBase: false,
                 };
 
-                // 3. Add to the correct category
-                const category = receiptData.category || 'Shopping'; // Fallback
+                // 5. Add to the correct category
                 categoryItems[category] = [...(categoryItems[category] || []), newItem];
 
                 // 4. Save back to AsyncStorage

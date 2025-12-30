@@ -9,60 +9,34 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     const currentYear = new Date().getFullYear();
     return {
       'Groceries': [
-        { id: 'base-1', name: 'Whole Foods', date: `Dec 10, ${currentYear}`, amount: 120, isBase: true },
-        { id: 'base-2', name: 'Trader Joe\'s', date: `Dec 12, ${currentYear}`, amount: 85, isBase: true },
-        { id: 'base-3', name: 'Local Market', date: `Dec 15, ${currentYear}`, amount: 95, isBase: true },
-        { id: 'base-4', name: 'Costco', date: `Dec 18, ${currentYear}`, amount: 150, isBase: true },
+        { id: 'base-1', name: 'Groceries - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Rent': [
-        { id: 'base-5', name: 'Monthly Rent Payment', date: `Dec 1, ${currentYear}`, amount: 1200, isBase: true },
+        { id: 'base-2', name: 'Rent - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Utilities': [
-        { id: 'base-6', name: 'Electric Bill', date: `Dec 5, ${currentYear}`, amount: 80, isBase: true },
-        { id: 'base-7', name: 'Water Bill', date: `Dec 8, ${currentYear}`, amount: 45, isBase: true },
-        { id: 'base-8', name: 'Internet', date: `Dec 10, ${currentYear}`, amount: 55, isBase: true },
+        { id: 'base-3', name: 'Utilities - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Transportation': [
-        { id: 'base-9', name: 'Gas Station', date: `Dec 7, ${currentYear}`, amount: 60, isBase: true },
-        { id: 'base-10', name: 'Gas Station', date: `Dec 14, ${currentYear}`, amount: 55, isBase: true },
-        { id: 'base-11', name: 'Public Transit Pass', date: `Dec 1, ${currentYear}`, amount: 90, isBase: true },
-        { id: 'base-12', name: 'Parking', date: `Dec 16, ${currentYear}`, amount: 45, isBase: true },
+        { id: 'base-4', name: 'Transportation - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Entertainment': [
-        { id: 'base-13', name: 'Movie Tickets', date: `Dec 9, ${currentYear}`, amount: 40, isBase: true },
-        { id: 'base-14', name: 'Concert', date: `Dec 13, ${currentYear}`, amount: 120, isBase: true },
-        { id: 'base-15', name: 'Streaming Services', date: `Dec 1, ${currentYear}`, amount: 45, isBase: true },
-        { id: 'base-16', name: 'Gaming', date: `Dec 20, ${currentYear}`, amount: 115, isBase: true },
+        { id: 'base-5', name: 'Entertainment - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Dining Out': [
-        { id: 'base-17', name: 'Restaurant A', date: `Dec 6, ${currentYear}`, amount: 65, isBase: true },
-        { id: 'base-18', name: 'Coffee Shop', date: `Dec 8, ${currentYear}`, amount: 15, isBase: true },
-        { id: 'base-19', name: 'Restaurant B', date: `Dec 11, ${currentYear}`, amount: 80, isBase: true },
-        { id: 'base-20', name: 'Fast Food', date: `Dec 14, ${currentYear}`, amount: 25, isBase: true },
-        { id: 'base-21', name: 'Restaurant C', date: `Dec 17, ${currentYear}`, amount: 95, isBase: true },
+        { id: 'base-6', name: 'Dining Out - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Healthcare': [
-        { id: 'base-22', name: 'Pharmacy', date: `Dec 4, ${currentYear}`, amount: 45, isBase: true },
-        { id: 'base-23', name: 'Doctor Visit Co-pay', date: `Dec 11, ${currentYear}`, amount: 105, isBase: true },
+        { id: 'base-7', name: 'Healthcare - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
-      'Wisconsin Trip': [
-        { id: 'base-24', name: 'Amazon', date: `Dec 3, ${currentYear}`, amount: 120, isBase: true },
-        { id: 'base-25', name: 'Target', date: `Dec 8, ${currentYear}`, amount: 85, isBase: true },
-        { id: 'base-26', name: 'Online Store', date: `Dec 14, ${currentYear}`, amount: 95, isBase: true },
-        { id: 'base-27', name: 'Department Store', date: `Dec 19, ${currentYear}`, amount: 100, isBase: true },
+      'Vacation': [
+        { id: 'base-8', name: 'Vacation - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Subscriptions': [
-        { id: 'base-28', name: 'Netflix', date: `Dec 1, ${currentYear}`, amount: 15, isBase: true },
-        { id: 'base-29', name: 'Spotify', date: `Dec 1, ${currentYear}`, amount: 10, isBase: true },
-        { id: 'base-30', name: 'Cloud Storage', date: `Dec 5, ${currentYear}`, amount: 10, isBase: true },
-        { id: 'base-31', name: 'News Subscription', date: `Dec 8, ${currentYear}`, amount: 12, isBase: true },
-        { id: 'base-32', name: 'Fitness App', date: `Dec 10, ${currentYear}`, amount: 20, isBase: true },
-        { id: 'base-33', name: 'Magazine', date: `Dec 15, ${currentYear}`, amount: 18, isBase: true },
+        { id: 'base-9', name: 'Subscriptions - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Savings': [
-        { id: 'base-34', name: 'Emergency Fund', date: `Dec 1, ${currentYear}`, amount: 300, isBase: true },
-        { id: 'base-35', name: 'Investment Account', date: `Dec 1, ${currentYear}`, amount: 200, isBase: true },
-        { id: 'base-36', name: 'Retirement (401k)', date: `Dec 1, ${currentYear}`, amount: 100, isBase: true },
+        { id: 'base-10', name: 'Savings - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
     };
   };
@@ -92,10 +66,24 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
         const savedCustomCategories = await AsyncStorage.getItem('customCategories');
 
         if (savedCategoryItems !== null) {
-          setCategoryItems(JSON.parse(savedCategoryItems));
+          let items = JSON.parse(savedCategoryItems);
+
+          // Migration: Rename 'Wisconsin Trip' to 'Vacation'
+          if (items['Wisconsin Trip']) {
+            items['Vacation'] = [
+              ...(items['Vacation'] || []),
+              ...items['Wisconsin Trip']
+            ];
+            delete items['Wisconsin Trip'];
+          }
+
+          setCategoryItems(items);
         }
         if (savedCustomCategories !== null) {
-          setCustomCategories(JSON.parse(savedCustomCategories));
+          let custom = JSON.parse(savedCustomCategories);
+          // Also migrate custom categories list if it's in there
+          const migratedCustom = custom.map(cat => cat === 'Wisconsin Trip' ? 'Vacation' : cat);
+          setCustomCategories(migratedCustom);
         }
       } catch (error) {
         console.error('Failed to load spending data:', error);
@@ -124,70 +112,70 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   const baseSpendingData = [
     {
       name: 'Groceries',
-      baseAmount: 450,
+      baseAmount: 100,
       color: '#FF0000',  // Pure Red
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Rent',
-      baseAmount: 1200,
+      baseAmount: 100,
       color: '#00CED1',  // Dark Turquoise
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Utilities',
-      baseAmount: 180,
+      baseAmount: 100,
       color: '#FFD700',  // Gold
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Transportation',
-      baseAmount: 250,
+      baseAmount: 100,
       color: '#00FF7F',  // Spring Green
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Entertainment',
-      baseAmount: 320,
+      baseAmount: 100,
       color: '#FF1493',  // Deep Pink
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Dining Out',
-      baseAmount: 280,
+      baseAmount: 100,
       color: '#6A5ACD',  // Slate Blue
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Healthcare',
-      baseAmount: 150,
+      baseAmount: 100,
       color: '#FF8C00',  // Dark Orange
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
-      name: 'Wisconsin Trip',
-      baseAmount: 400,
+      name: 'Vacation',
+      baseAmount: 100,
       color: '#8B00FF',  // Electric Violet
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Subscriptions',
-      baseAmount: 85,
+      baseAmount: 100,
       color: '#1E90FF',  // Dodger Blue
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
     {
       name: 'Savings',
-      baseAmount: 600,
+      baseAmount: 100,
       color: '#32CD32',  // Lime Green
       legendFontColor: '#32CD32',
       legendFontSize: 14,

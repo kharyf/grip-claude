@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
@@ -22,6 +23,13 @@ export default function App() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
+    // Initialize Google Mobile Ads
+    mobileAds()
+      .initialize()
+      .then(adapterStatuses => {
+        console.log('Mobile Ads Initialized');
+      });
+
     const loadCurrency = async () => {
       try {
         const savedCurrency = await AsyncStorage.getItem('currency');
@@ -119,6 +127,17 @@ export default function App() {
       {/* Content */}
       <View style={styles.content}>
         {renderContent()}
+      </View>
+
+      {/* Banner Ad */}
+      <View style={styles.adContainer}>
+        <BannerAd
+          unitId={TestIds.BANNER}
+          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+          requestOptions={{
+            requestNonPersonalizedAdsOnly: true,
+          }}
+        />
       </View>
 
       {/* User Menu Modal */}
@@ -250,6 +269,14 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  adContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    borderTopWidth: 1,
+    borderTopColor: '#32CD32',
+    paddingVertical: 5,
   },
   menuOverlay: {
     flex: 1,

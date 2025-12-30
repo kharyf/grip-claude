@@ -57,10 +57,10 @@ export const parseReceiptText = (text) => {
     // 4. Suggest category based on merchant
     const categoryMap = {
         'Whole Foods': 'Groceries',
-        'Target': 'Shopping',
+        'Target': 'Groceries',
         'Starbucks': 'Dining Out',
         'Shell': 'Transportation',
-        'Amazon': 'Shopping',
+        'Amazon': 'Groceries',
         'Walmart': 'Groceries',
         'Uber': 'Transportation',
         'McDonald': 'Dining Out'
