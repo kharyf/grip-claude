@@ -2,11 +2,11 @@
   "expo": {
     "name": "Gripah",
     "slug": "FinanceApp_SDK54",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loxodonta.gripah",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app needs access to your camera to scan receipts and automatically add spending items.",
@@ -28,6 +29,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.gripah",
+      "versionCode": 2,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -58,11 +60,21 @@
             "deploymentTarget": "15.5"
           }
         }
+      ],
+      [
+        "react-native-auth0",
+        {
+          "domain": "your-domain.auth0.com",
+          "customScheme": "com.loxodonta.gripah.auth0"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.loxodonta.gripah",
+          "enableGooglePay": true
+        }
       ]
     ]
-  },
-  "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-3940256099942544~3347511713",
-    "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
   }
 }

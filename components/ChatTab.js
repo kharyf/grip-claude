@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Keyboa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { useSubscription } from '../context/SubscriptionContext';
 import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { parseReceiptText } from '../utils/receiptParser';
 
@@ -11,6 +12,7 @@ const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
 });
 
 const ChatTab = ({ currencySymbol = '$' }) => {
+  const { status } = useSubscription();
   const [messages, setMessages] = useState([
     {
       id: 1,

@@ -1,6 +1,6 @@
 {
   "name": "gripah",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -14,6 +14,7 @@
     "@react-native-community/slider": "5.0.1",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@react-native-picker/picker": "2.11.1",
+    "@stripe/stripe-react-native": "^0.57.2",
     "expo": "~54.0.29",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "^17.0.10",
@@ -23,6 +24,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-auth0": "^5.3.1",
     "react-native-chart-kit": "^6.12.0",
     "react-native-google-mobile-ads": "^16.0.1",
     "react-native-svg": "15.12.1",

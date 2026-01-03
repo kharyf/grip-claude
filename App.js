@@ -3,9 +3,17 @@ import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'r
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { Auth0Provider } from 'react-native-auth0';
+import { StripeProvider } from '@stripe/stripe-react-native';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { SubscriptionProvider } from './context/SubscriptionContext';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
+
+const AUTH0_DOMAIN = "your-domain.auth0.com";
+const AUTH0_CLIENT_ID = "your-client-id";
+const STRIPE_PUBLISHABLE_KEY = "pk_test_...";
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -76,6 +84,28 @@ export default function App() {
     }
   };
 
+  const { user, login, isLoading } = useAuth();
+  const { status } = useSubscription();
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.appTitle}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.appTitle}>Gripah</Text>
+        <TouchableOpacity style={styles.loginButton} onPress={login}>
+          <Text style={styles.loginButtonText}>Log In to Continue</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
@@ -129,16 +159,18 @@ export default function App() {
         {renderContent()}
       </View>
 
-      {/* Banner Ad */}
-      <View style={styles.adContainer}>
-        <BannerAd
-          unitId={TestIds.BANNER}
-          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          requestOptions={{
-            requestNonPersonalizedAdsOnly: true,
-          }}
-        />
-      </View>
+      {/* Banner Ad - Only for free users */}
+      {status !== 'active' && (
+        <View style={styles.adContainer}>
+          <BannerAd
+            unitId={TestIds.BANNER}
+            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+            requestOptions={{
+              requestNonPersonalizedAdsOnly: true,
+            }}
+          />
+        </View>
+      )}
 
       {/* User Menu Modal */}
       <Modal
@@ -189,6 +221,20 @@ export default function App() {
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+export default function Root() {
+  return (
+    <Auth0Provider domain={AUTH0_DOMAIN} clientId={AUTH0_CLIENT_ID}>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+            <App />
+          </StripeProvider>
+        </SubscriptionProvider>
+      </AuthProvider>
+    </Auth0Provider>
   );
 }
 
@@ -312,5 +358,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#32CD32',
     fontWeight: '600',
+  },
+  loginButton: {
+    backgroundColor: '#32CD32',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    marginTop: 20,
+  },
+  loginButtonText: {
+    color: '#1a1a1a',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

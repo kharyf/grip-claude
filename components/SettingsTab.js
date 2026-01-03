@@ -3,6 +3,9 @@ import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, Modal, Al
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
+import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
+import SubscriptionScreen from './SubscriptionScreen';
 
 const SettingsTab = ({ currency, onCurrencyChange }) => {
   // Toggle settings
@@ -12,6 +15,8 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
   const [budgetAlert, setBudgetAlert] = useState(80);
   const [chartRefreshRate, setChartRefreshRate] = useState(30);
   const [fontSize, setFontSize] = useState(16);
+  const { logout } = useAuth();
+  const { status, subscription } = useSubscription();
 
   // Options
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -138,6 +143,32 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
           </View>
 
 
+        </View>
+        {/* Subscription Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Subscription</Text>
+          <Text style={styles.settingDescription}>Upgrade to Pro to remove all advertisements from the app.</Text>
+          <View style={[styles.settingItem, { marginTop: 10 }]}>
+            <Text style={styles.settingLabel}>Status</Text>
+            <Text style={[
+              styles.statusText,
+              status === 'active' ? styles.activeStatus : (subscription?.status === 'past_due' ? styles.warningStatus : styles.inactiveStatus)
+            ]}>
+              {status === 'active' ? (subscription?.status === 'trialing' ? 'Pro (Trial)' : 'Pro') : (subscription?.status === 'past_due' ? 'Past Due' : 'Free')}
+            </Text>
+          </View>
+          {status !== 'active' && <SubscriptionScreen />}
+        </View>
+
+        {/* Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity
+            style={[styles.resetButton, { backgroundColor: '#444', marginBottom: 10 }]}
+            onPress={logout}
+          >
+            <Text style={styles.buttonText}>Log Out</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -282,6 +313,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -337,6 +373,19 @@ const styles = StyleSheet.create({
   confirmResetButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  statusText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  activeStatus: {
+    color: '#32CD32',
+  },
+  inactiveStatus: {
+    color: '#888',
+  },
+  warningStatus: {
+    color: '#FFCC00',
   },
 });
 
