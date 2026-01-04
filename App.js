@@ -6,7 +6,7 @@ import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-
 import { Auth0Provider } from 'react-native-auth0';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { SubscriptionProvider } from './context/SubscriptionContext';
+import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
@@ -23,7 +23,7 @@ const CURRENCY_SYMBOLS = {
   CAD: 'C$',
 };
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState('Spending');
   const [menuVisible, setMenuVisible] = useState(false);
   const [chartType, setChartType] = useState('Pie');
@@ -224,13 +224,13 @@ export default function App() {
   );
 }
 
-export default function Root() {
+export default function App() {
   return (
     <Auth0Provider domain={AUTH0_DOMAIN} clientId={AUTH0_CLIENT_ID}>
       <AuthProvider>
         <SubscriptionProvider>
           <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-            <App />
+            <AppContent />
           </StripeProvider>
         </SubscriptionProvider>
       </AuthProvider>

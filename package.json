@@ -11,10 +11,11 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
-    "@react-native-community/slider": "5.0.1",
+    "@react-native-community/cli": "^20.0.2",
+    "@react-native-community/slider": "^5.1.1",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@react-native-picker/picker": "2.11.1",
-    "@stripe/stripe-react-native": "^0.57.2",
+    "@stripe/stripe-react-native": "0.50.3",
     "expo": "~54.0.29",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "^17.0.10",
@@ -30,5 +31,20 @@
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@react-native-ml-kit/text-recognition",
+          "@react-native-community/slider"
+        ]
+      }
+    },
+    "install": {
+      "exclude": [
+        "@react-native-community/slider"
+      ]
+    }
+  }
 }
