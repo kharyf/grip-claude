@@ -57,7 +57,15 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.5"
+            "deploymentTarget": "15.5",
+            "useFrameworks": "static",
+            "podfileProperties": {
+              "use_modular_headers!": true
+            },
+            "buildReactNativeFromSource": true,
+            "excludedArchitectures": [
+              "arm64"
+            ]
           }
         }
       ],

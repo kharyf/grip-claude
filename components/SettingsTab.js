@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, Modal, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import Slider from '@react-native-community/slider';
+import { Slider } from '@miblanchard/react-native-slider';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import SubscriptionScreen from './SubscriptionScreen';
@@ -68,13 +68,13 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             </View>
             <Slider
               style={styles.slider}
+              value={budgetAlert}
+              onValueChange={value => setBudgetAlert(Array.isArray(value) ? value[0] : value)}
               minimumValue={0}
               maximumValue={100}
-              value={budgetAlert}
-              onValueChange={setBudgetAlert}
               minimumTrackTintColor="#32CD32"
               maximumTrackTintColor="#767577"
-              thumbTintColor="#32CD32"
+              thumbStyle={{ backgroundColor: '#32CD32' }}
             />
           </View>
 
@@ -86,13 +86,13 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             </View>
             <Slider
               style={styles.slider}
+              value={chartRefreshRate}
+              onValueChange={value => setChartRefreshRate(Array.isArray(value) ? value[0] : value)}
               minimumValue={10}
               maximumValue={120}
-              value={chartRefreshRate}
-              onValueChange={setChartRefreshRate}
               minimumTrackTintColor="#32CD32"
               maximumTrackTintColor="#767577"
-              thumbTintColor="#32CD32"
+              thumbStyle={{ backgroundColor: '#32CD32' }}
             />
           </View>
 
@@ -104,13 +104,13 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             </View>
             <Slider
               style={styles.slider}
+              value={fontSize}
+              onValueChange={value => setFontSize(Array.isArray(value) ? value[0] : value)}
               minimumValue={12}
               maximumValue={24}
-              value={fontSize}
-              onValueChange={setFontSize}
               minimumTrackTintColor="#32CD32"
               maximumTrackTintColor="#767577"
-              thumbTintColor="#32CD32"
+              thumbStyle={{ backgroundColor: '#32CD32' }}
             />
           </View>
         </View>
