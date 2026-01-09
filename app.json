@@ -2,6 +2,7 @@
   "expo": {
     "name": "Gripah",
     "slug": "FinanceApp_SDK54",
+    "scheme": "gripah",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -67,13 +68,6 @@
               "arm64"
             ]
           }
-        }
-      ],
-      [
-        "react-native-auth0",
-        {
-          "domain": "your-domain.auth0.com",
-          "customScheme": "com.loxodonta.gripah.auth0"
         }
       ],
       [

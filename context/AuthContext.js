@@ -1,40 +1,63 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import Auth0, { useAuth0 } from 'react-native-auth0';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrentUser, fetchAuthSession, signInWithRedirect, signOut } from 'aws-amplify/auth';
+import { Hub } from 'aws-amplify/utils';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const { authorize, clearSession, user, error, isLoading, getCredentials } = useAuth0();
+    const [user, setUser] = useState(null);
     const [token, setToken] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const checkUser = async () => {
+        try {
+            const currentUser = await getCurrentUser();
+            const session = await fetchAuthSession();
+
+            setUser(currentUser);
+            setToken(session.tokens?.accessToken?.toString() || null);
+        } catch (e) {
+            setUser(null);
+            setToken(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchToken = async () => {
-            if (user) {
-                try {
-                    const credentials = await getCredentials();
-                    setToken(credentials.accessToken);
-                } catch (e) {
-                    console.error('Failed to get credentials:', e);
-                }
-            } else {
-                setToken(null);
+        checkUser();
+
+        const unsubscribe = Hub.listen('auth', ({ payload }) => {
+            switch (payload.event) {
+                case 'signedIn':
+                    checkUser();
+                    break;
+                case 'signedOut':
+                    setUser(null);
+                    setToken(null);
+                    break;
+                case 'signInWithRedirect_failure':
+                    setError('Login failed');
+                    break;
             }
-        };
-        fetchToken();
-    }, [user]);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const login = async () => {
         try {
-            await authorize({ scope: 'openid profile email' });
+            await signInWithRedirect();
         } catch (e) {
             console.log('Login failed', e);
+            setError(e.message);
         }
     };
 
     const logout = async () => {
         try {
-            await clearSession();
+            await signOut();
         } catch (e) {
             console.log('Logout failed', e);
         }

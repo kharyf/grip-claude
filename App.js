@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'r
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { Auth0Provider } from 'react-native-auth0';
+import { Amplify } from 'aws-amplify';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
@@ -11,8 +11,25 @@ import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
 
-const AUTH0_DOMAIN = "your-domain.auth0.com";
-const AUTH0_CLIENT_ID = "your-client-id";
+// Amplify Configuration
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: 'us-east-1_HOQuZlwJr',
+      userPoolClientId: '6un31sgrnb8ghadrveq5oi8eej',
+      loginWith: {
+        oauth: {
+          domain: 'https://us-east-1hoquzlwjr.auth.us-east-1.amazoncognito.com',
+          scopes: ['email', 'openid', 'profile'],
+          redirectSignIn: ['gripah://callback'],
+          redirectSignOut: ['gripah://logout'],
+          responseType: 'code'
+        }
+      }
+    }
+  }
+});
+
 const STRIPE_PUBLISHABLE_KEY = "pk_test_...";
 
 const CURRENCY_SYMBOLS = {
@@ -211,7 +228,7 @@ function AppContent() {
               style={[styles.menuItem, styles.menuItemLast]}
               onPress={() => {
                 setMenuVisible(false);
-                // Handle logout action
+                logout();
               }}
             >
               <Text style={styles.menuIcon}>🚪</Text>
@@ -226,15 +243,13 @@ function AppContent() {
 
 export default function App() {
   return (
-    <Auth0Provider domain={AUTH0_DOMAIN} clientId={AUTH0_CLIENT_ID}>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-            <AppContent />
-          </StripeProvider>
-        </SubscriptionProvider>
-      </AuthProvider>
-    </Auth0Provider>
+    <AuthProvider>
+      <SubscriptionProvider>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+          <AppContent />
+        </StripeProvider>
+      </SubscriptionProvider>
+    </AuthProvider>
   );
 }
 
