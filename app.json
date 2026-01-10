@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -60,6 +60,7 @@
           "ios": {
             "deploymentTarget": "15.5",
             "useFrameworks": "static",
+            "newArchEnabled": true,
             "podfileProperties": {
               "use_modular_headers!": true
             },
@@ -67,6 +68,9 @@
             "excludedArchitectures": [
               "arm64"
             ]
+          },
+          "android": {
+            "newArchEnabled": true
           }
         }
       ],
@@ -76,7 +80,8 @@
           "merchantIdentifier": "merchant.com.loxodonta.gripah",
           "enableGooglePay": true
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

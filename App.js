@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Platform, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { Amplify } from 'aws-amplify';
+import * as WebBrowser from 'expo-web-browser';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
@@ -11,24 +12,26 @@ import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
 
-// Amplify Configuration
-Amplify.configure({
+// Simplified Amplify configuration to debug strict mode issue
+const amplifyConfig = {
   Auth: {
     Cognito: {
       userPoolId: 'us-east-1_HOQuZlwJr',
       userPoolClientId: '6un31sgrnb8ghadrveq5oi8eej',
-      loginWith: {
-        oauth: {
-          domain: 'https://us-east-1hoquzlwjr.auth.us-east-1.amazoncognito.com',
-          scopes: ['email', 'openid', 'profile'],
-          redirectSignIn: ['gripah://callback'],
-          redirectSignOut: ['gripah://logout'],
-          responseType: 'code'
-        }
-      }
+      // oauth section temporarily removed to identify strict mode cause
     }
   }
-});
+};
+
+// Configure Amplify at the top level
+try {
+  console.log('Attempting Amplify.configure with minimal config...');
+  Amplify.configure(amplifyConfig);
+  console.log('Amplify.configure successful');
+} catch (e) {
+  console.error('Amplify.configure failed:', e.name, e.message);
+  // Fallback or retry logic could go here
+}
 
 const STRIPE_PUBLISHABLE_KEY = "pk_test_...";
 
@@ -101,7 +104,7 @@ function AppContent() {
     }
   };
 
-  const { user, login, isLoading } = useAuth();
+  const { user, login, isLoading, error: authError } = useAuth();
   const { status } = useSubscription();
 
   if (isLoading) {
@@ -119,6 +122,11 @@ function AppContent() {
         <TouchableOpacity style={styles.loginButton} onPress={login}>
           <Text style={styles.loginButtonText}>Log In to Continue</Text>
         </TouchableOpacity>
+        {authError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{authError}</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -385,5 +393,22 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  statusText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

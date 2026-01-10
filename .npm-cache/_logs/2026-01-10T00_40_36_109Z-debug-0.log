@@ -1,0 +1,19 @@
+0 verbose cli /usr/local/bin/node /usr/local/bin/npm
+1 info using npm@11.7.0
+2 info using node@v25.2.1
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 warn Unknown cli config "--reset-cache". This will stop working in the next major version of npm.
+5 silly config load:file:/Users/kharyfiler/Documents/grip-claude/.npmrc
+6 silly config load:file:/Users/kharyfiler/.npmrc
+7 silly config load:file:/usr/local/etc/npmrc
+8 verbose title npm start
+9 verbose argv "start" "--reset-cache"
+10 verbose logfile logs-max:10 dir:/Users/kharyfiler/Documents/grip-claude/.npm-cache/_logs/2026-01-10T00_40_36_109Z-
+11 verbose logfile /Users/kharyfiler/Documents/grip-claude/.npm-cache/_logs/2026-01-10T00_40_36_109Z-debug-0.log
+12 silly logfile done cleaning log files
+13 verbose cwd /Users/kharyfiler/Documents/grip-claude
+14 verbose os Darwin 24.6.0
+15 verbose node v25.2.1
+16 verbose npm  v11.7.0
+17 verbose exit 0
+18 info ok
