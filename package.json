@@ -17,7 +17,7 @@
     "@react-native-community/cli": "^20.0.2",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@react-native-picker/picker": "2.11.1",
-    "@stripe/stripe-react-native": "0.50.3",
+    "@stripe/stripe-react-native": "^0.57.2",
     "aws-amplify": "^6.15.9",
     "axios": "^0.27.2",
     "expo": "~54.0.31",
