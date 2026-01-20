@@ -19,7 +19,8 @@
     "@react-native-picker/picker": "2.11.1",
     "@stripe/stripe-react-native": "^0.57.2",
     "aws-amplify": "^6.15.9",
-    "axios": "^0.27.2",
+    "axios": "^1.13.2",
+    "dequal": "^2.0.3",
     "expo": "~54.0.31",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "^17.0.10",
@@ -27,6 +28,8 @@
     "expo-image-picker": "^17.0.10",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
+    "postcss-value-parser": "^4.2.0",
+    "pretty-format": "^29.7.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -34,7 +37,10 @@
     "react-native-get-random-values": "~1.11.0",
     "react-native-google-mobile-ads": "^16.0.1",
     "react-native-svg": "15.12.1",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.2",
+    "react-refresh": "^0.14.2",
+    "styleq": "^0.2.1",
+    "use-deep-compare-effect": "^1.8.1"
   },
   "private": true,
   "expo": {

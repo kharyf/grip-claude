@@ -1,32 +1,52 @@
 require('dotenv').config();
 const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { auth } = require('express-oauth2-jwt-bearer');
+const { CognitoJwtVerifier } = require("aws-jwt-verify");
 const cors = require('cors');
 
 const app = express();
 
 // Use JSON for all routes
 app.use(express.json());
-
 app.use(cors());
 
-// Auth0 JWT check
-const checkJwt = auth({
-    audience: process.env.AUTH0_AUDIENCE,
-    issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}/`,
-    tokenSigningAlg: 'RS256'
+// Cognito JWT Verifier
+const verifier = CognitoJwtVerifier.create({
+    userPoolId: process.env.COGNITO_USER_POOL_ID,
+    tokenUse: "access",
+    clientId: process.env.COGNITO_CLIENT_ID,
 });
+
+// Middleware to check Cognito JWT
+const checkJwt = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).send({ error: "No authorization header" });
+        }
+
+        const token = authHeader.split(" ")[1];
+        const payload = await verifier.verify(token);
+
+        // Attach user info to request
+        req.user = payload;
+        req.userId = payload.sub;
+        next();
+    } catch (err) {
+        console.error("Token verification failed:", err);
+        return res.status(401).send({ error: "Unauthorized" });
+    }
+};
 
 // Root endpoint
 app.get('/', (req, res) => {
-    res.send('Gripah Backend is running.');
+    res.send('Gripah Backend is running with Cognito Auth.');
 });
 
 // Create Stripe Checkout Session (for Subscriptions)
 app.post('/create-subscription', checkJwt, async (req, res) => {
     const { email, priceId } = req.body;
-    const userId = req.auth.payload.sub;
+    const userId = req.userId;
 
     try {
         // 1. Find or Create Customer
@@ -34,10 +54,16 @@ app.post('/create-subscription', checkJwt, async (req, res) => {
         const customers = await stripe.customers.list({ email, limit: 1 });
         if (customers.data.length > 0) {
             customer = customers.data[0];
+            // Update metadata if it doesn't have cognitoId
+            if (!customer.metadata.cognitoId) {
+                await stripe.customers.update(customer.id, {
+                    metadata: { cognitoId: userId }
+                });
+            }
         } else {
             customer = await stripe.customers.create({
                 email,
-                metadata: { auth0Id: userId }
+                metadata: { cognitoId: userId }
             });
         }
 
@@ -65,8 +91,6 @@ app.post('/webhook', async (req, res) => {
     let event;
 
     try {
-        // Amazon EventBridge typically wraps the Stripe event in a 'detail' field.
-        // We also no longer verify the Stripe signature here since AWS handles security.
         event = req.body.detail || req.body;
 
         if (!event || !event.type) {
@@ -78,39 +102,31 @@ app.post('/webhook', async (req, res) => {
     }
 
     // Handle the event
-    // NOTE: In production, you would update your database (e.g., MongoDB/Postgres) here.
     switch (event.type) {
         case 'checkout.session.completed':
             const session = event.data.object;
             console.log(`Checkout completed for customer: ${session.customer}`);
-            // Provision the subscription here if not already done
             break;
 
         case 'invoice.paid':
-            // Fires for every successful payment (monthly renewal)
             const invoice = event.data.object;
             console.log(`Invoice ${invoice.id} paid. Extending Pro access for ${invoice.customer}.`);
-            // Update user's "subscriptionStatus" to 'active' in DB
             break;
 
         case 'invoice.payment_failed':
-            // Fires when renewal fails
             const failedInvoice = event.data.object;
             console.log(`Payment failed for ${failedInvoice.customer}. revoking/warning Pro status.`);
-            // Update user's "subscriptionStatus" to 'past_due' or 'canceled'
             break;
 
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
             const subUpdated = event.data.object;
             console.log(`Subscription ${subUpdated.id} updated. Status: ${subUpdated.status}`);
-            // Handle plan changes or initial creation
             break;
 
         case 'customer.subscription.deleted':
             const subDeleted = event.data.object;
-            console.log(`Subscription ${subDeleted.id} deleted (cancelled or expired).`);
-            // Revoke Pro access immediately in DB
+            console.log(`Subscription ${subDeleted.id} deleted.`);
             break;
 
         default:
@@ -122,14 +138,12 @@ app.post('/webhook', async (req, res) => {
 
 // Subscription status endpoint
 app.get('/subscription-status', checkJwt, async (req, res) => {
-    const userId = req.auth.payload.sub;
+    const userId = req.userId;
 
     try {
-        // In a production app, you should look this up in YOUR database (e.g. users.findOne({ auth0Id: userId }))
-        // Direct Stripe queries are slow and hit rate limits.
-        // For now, we search by metadata as a fallback.
+        // Search by cognitoId metadata
         const customers = await stripe.customers.search({
-            query: `metadata['auth0Id']:'${userId}'`,
+            query: `metadata['cognitoId']:'${userId}'`,
         });
 
         if (customers.data.length === 0) {
@@ -139,13 +153,12 @@ app.get('/subscription-status', checkJwt, async (req, res) => {
         const customer = customers.data[0];
         const subscriptions = await stripe.subscriptions.list({
             customer: customer.id,
-            status: 'all', // Check all to catch past_due or trialing
+            status: 'all',
             limit: 1,
         });
 
         if (subscriptions.data.length > 0) {
             const subscription = subscriptions.data[0];
-            // 'active' and 'trialing' both qualify for Pro (no ads)
             const isPro = ['active', 'trialing'].includes(subscription.status);
             res.send({
                 status: isPro ? 'active' : 'none',

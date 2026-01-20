@@ -1,39 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Platform, Linking } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { Amplify } from 'aws-amplify';
-import * as WebBrowser from 'expo-web-browser';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
+import LoginScreen from './components/LoginScreen';
 
-// Simplified Amplify configuration to debug strict mode issue
+// Cognito User Pool configuration - simplified for native email/password auth
 const amplifyConfig = {
   Auth: {
     Cognito: {
-      userPoolId: 'us-east-1_HOQuZlwJr',
-      userPoolClientId: '6un31sgrnb8ghadrveq5oi8eej',
-      // oauth section temporarily removed to identify strict mode cause
+      userPoolId: 'us-east-1_ep4c0DVRU',
+      userPoolClientId: '2rbspi5nhednfsjhp7t2h3lcei',
     }
   }
 };
 
-// Configure Amplify at the top level
+// Configure Amplify with Cognito
 try {
-  console.log('Attempting Amplify.configure with minimal config...');
+  console.log('Configuring Amplify with Cognito...');
   Amplify.configure(amplifyConfig);
-  console.log('Amplify.configure successful');
+  console.log('Amplify configured successfully');
 } catch (e) {
-  console.error('Amplify.configure failed:', e.name, e.message);
-  // Fallback or retry logic could go here
+  console.error('Amplify configuration failed:', e.name, e.message);
 }
 
-const STRIPE_PUBLISHABLE_KEY = "pk_test_...";
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -104,30 +102,42 @@ function AppContent() {
     }
   };
 
-  const { user, login, isLoading, error: authError } = useAuth();
+  const {
+    user,
+    login,
+    register,
+    confirmAccount,
+    forgotPassword,
+    logout,
+    isLoading,
+    isAuthenticating,
+    error: authError,
+    needsConfirmation,
+  } = useAuth();
   const { status } = useSubscription();
 
+  // Show loading screen during initial auth check
   if (isLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.appTitle}>Loading...</Text>
+        <Text style={styles.appTitle}>Gripah</Text>
+        <Text style={[styles.tabText, { marginTop: 10 }]}>Loading...</Text>
       </View>
     );
   }
 
+  // Show login screen if user is not authenticated
   if (!user) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.appTitle}>Gripah</Text>
-        <TouchableOpacity style={styles.loginButton} onPress={login}>
-          <Text style={styles.loginButtonText}>Log In to Continue</Text>
-        </TouchableOpacity>
-        {authError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{authError}</Text>
-          </View>
-        )}
-      </View>
+      <LoginScreen
+        onLogin={login}
+        onSignUp={register}
+        onForgotPassword={forgotPassword}
+        onConfirmAccount={confirmAccount}
+        error={authError}
+        isLoading={isAuthenticating}
+        needsConfirmation={needsConfirmation}
+      />
     );
   }
 
@@ -210,27 +220,12 @@ function AppContent() {
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                // Handle view profile action
-              }}
-            >
-              <Text style={styles.menuIcon}>👤</Text>
-              <Text style={styles.menuText}>View Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                // Handle account settings action
-              }}
-            >
-              <Text style={styles.menuIcon}>⚙️</Text>
-              <Text style={styles.menuText}>Account Settings</Text>
-            </TouchableOpacity>
+            <View style={styles.menuItem}>
+              <Text style={styles.menuIcon}>�</Text>
+              <Text style={styles.menuText}>
+                {status === 'active' ? 'Premium User' : 'Free User'}
+              </Text>
+            </View>
 
             <TouchableOpacity
               style={[styles.menuItem, styles.menuItemLast]}

@@ -8,7 +8,7 @@ export const SubscriptionProvider = ({ children }) => {
     const [status, setStatus] = useState('none'); // 'none', 'active', 'loading'
     const [subscription, setSubscription] = useState(null);
 
-    const API_URL = 'http://localhost:3000'; // Replace with actual backend URL in production
+    const API_URL = 'http://192.168.1.227:3000'; // Updated for device connectivity
 
     const checkStatus = async () => {
         if (!token) {
@@ -19,11 +19,22 @@ export const SubscriptionProvider = ({ children }) => {
 
         setStatus('loading');
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
             const response = await fetch(`${API_URL}/subscription-status`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error('Server unreachable or returned error');
+            }
+
             const data = await response.json();
             setStatus(data.status);
             setSubscription({
@@ -31,7 +42,8 @@ export const SubscriptionProvider = ({ children }) => {
                 id: data.subscriptionId
             });
         } catch (error) {
-            console.error('Failed to check subscription status:', error);
+            // Log error but don't crash, and keep status at 'none'
+            console.log('Subscription check skipped (server likely not reachable on this network):', error.message);
             setStatus('none');
         }
     };
