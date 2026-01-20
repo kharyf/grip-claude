@@ -13,8 +13,6 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
 
   // Slider settings
   const [budgetAlert, setBudgetAlert] = useState(80);
-  const [chartRefreshRate, setChartRefreshRate] = useState(30);
-  const [fontSize, setFontSize] = useState(16);
   const { logout } = useAuth();
   const { status, subscription } = useSubscription();
 
@@ -77,42 +75,6 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
               thumbStyle={{ backgroundColor: '#32CD32' }}
             />
           </View>
-
-          {/* Slider 2: Chart Refresh Rate */}
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Chart Refresh Rate</Text>
-              <Text style={styles.settingDescription}>{Math.round(chartRefreshRate)} seconds</Text>
-            </View>
-            <Slider
-              style={styles.slider}
-              value={chartRefreshRate}
-              onValueChange={value => setChartRefreshRate(Array.isArray(value) ? value[0] : value)}
-              minimumValue={10}
-              maximumValue={120}
-              minimumTrackTintColor="#32CD32"
-              maximumTrackTintColor="#767577"
-              thumbStyle={{ backgroundColor: '#32CD32' }}
-            />
-          </View>
-
-          {/* Slider 3: Font Size */}
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Font Size</Text>
-              <Text style={styles.settingDescription}>{Math.round(fontSize)}px</Text>
-            </View>
-            <Slider
-              style={styles.slider}
-              value={fontSize}
-              onValueChange={value => setFontSize(Array.isArray(value) ? value[0] : value)}
-              minimumValue={12}
-              maximumValue={24}
-              minimumTrackTintColor="#32CD32"
-              maximumTrackTintColor="#767577"
-              thumbStyle={{ backgroundColor: '#32CD32' }}
-            />
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -147,14 +109,14 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
         {/* Subscription Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Subscription</Text>
-          <Text style={styles.settingDescription}>Upgrade to Pro to remove all advertisements from the app.</Text>
+          <Text style={styles.settingDescription}>Upgrade to Premium to remove all advertisements from the app.</Text>
           <View style={[styles.settingItem, { marginTop: 10 }]}>
             <Text style={styles.settingLabel}>Status</Text>
             <Text style={[
               styles.statusText,
               status === 'active' ? styles.activeStatus : (subscription?.status === 'past_due' ? styles.warningStatus : styles.inactiveStatus)
             ]}>
-              {status === 'active' ? (subscription?.status === 'trialing' ? 'Pro (Trial)' : 'Pro') : (subscription?.status === 'past_due' ? 'Past Due' : 'Free')}
+              {status === 'active' ? (subscription?.status === 'trialing' ? 'Premium (Trial)' : 'Premium') : (subscription?.status === 'past_due' ? 'Past Due' : 'Free')}
             </Text>
           </View>
           {status !== 'active' && <SubscriptionScreen />}

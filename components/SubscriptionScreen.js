@@ -59,9 +59,9 @@ const SubscriptionScreen = () => {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Gripah Pro</Text>
+            <Text style={styles.title}>Gripah Premium</Text>
             <Text style={styles.description}>Enjoy an ad-free experience and support the development of Gripah.</Text>
-            <Text style={styles.price}>$9.99 / month</Text>
+            <Text style={styles.price}>$2.99 / month</Text>
 
             <TouchableOpacity
                 style={styles.subscribeButton}

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import {
     getCurrentUser,
     fetchAuthSession,
+    fetchUserAttributes,
     signIn,
     signUp,
     signOut,
@@ -27,8 +28,12 @@ export const AuthProvider = ({ children }) => {
         try {
             const currentUser = await getCurrentUser();
             const session = await fetchAuthSession();
+            const attributes = await fetchUserAttributes();
 
-            setUser(currentUser);
+            setUser({
+                ...currentUser,
+                attributes: attributes
+            });
             setToken(session.tokens?.accessToken?.toString() || null);
         } catch (e) {
             setUser(null);

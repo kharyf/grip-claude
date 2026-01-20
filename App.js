@@ -116,6 +116,9 @@ function AppContent() {
   } = useAuth();
   const { status } = useSubscription();
 
+  const userEmail = user?.attributes?.email || user?.username || '';
+  const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : '👤';
+
   // Show loading screen during initial auth check
   if (isLoading) {
     return (
@@ -152,7 +155,7 @@ function AppContent() {
           onPress={() => setMenuVisible(true)}
         >
           <View style={styles.userIcon}>
-            <Text style={styles.userIconText}>👤</Text>
+            <Text style={styles.userIconText}>{userInitial}</Text>
           </View>
         </TouchableOpacity>
         <Text style={styles.appTitle}>Gripah</Text>
@@ -221,7 +224,14 @@ function AppContent() {
         >
           <View style={styles.menuContainer}>
             <View style={styles.menuItem}>
-              <Text style={styles.menuIcon}>�</Text>
+              <Text style={styles.menuIcon}>📧</Text>
+              <Text style={styles.menuText} numberOfLines={1} ellipsizeMode="tail">
+                {userEmail}
+              </Text>
+            </View>
+
+            <View style={styles.menuItem}>
+              <Text style={styles.menuIcon}>💎</Text>
               <Text style={styles.menuText}>
                 {status === 'active' ? 'Premium User' : 'Free User'}
               </Text>
@@ -285,7 +295,9 @@ const styles = StyleSheet.create({
     borderColor: '#1a1a1a',
   },
   userIconText: {
-    fontSize: 24,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
   },
   userIconPlaceholder: {
     width: 40,

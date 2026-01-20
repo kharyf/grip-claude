@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
+import { Picker } from '@react-native-picker/picker';
 
 const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Initialize with base items for all categories
@@ -14,23 +15,8 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       'Rent': [
         { id: 'base-2', name: 'Rent - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
-      'Utilities': [
-        { id: 'base-3', name: 'Utilities - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Transportation': [
-        { id: 'base-4', name: 'Transportation - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
       'Entertainment': [
         { id: 'base-5', name: 'Entertainment - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Dining Out': [
-        { id: 'base-6', name: 'Dining Out - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Healthcare': [
-        { id: 'base-7', name: 'Healthcare - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Vacation': [
-        { id: 'base-8', name: 'Vacation - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
       ],
       'Subscriptions': [
         { id: 'base-9', name: 'Subscriptions - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
@@ -56,6 +42,8 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   const [editItemName, setEditItemName] = useState('');
   const [editItemDate, setEditItemDate] = useState('');
   const [editItemAmount, setEditItemAmount] = useState('');
+  const [timeRange, setTimeRange] = useState('All Time');
+  const [timeRangeModalVisible, setTimeRangeModalVisible] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Load data from AsyncStorage on mount
@@ -67,23 +55,11 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
 
         if (savedCategoryItems !== null) {
           let items = JSON.parse(savedCategoryItems);
-
-          // Migration: Rename 'Wisconsin Trip' to 'Vacation'
-          if (items['Wisconsin Trip']) {
-            items['Vacation'] = [
-              ...(items['Vacation'] || []),
-              ...items['Wisconsin Trip']
-            ];
-            delete items['Wisconsin Trip'];
-          }
-
           setCategoryItems(items);
         }
         if (savedCustomCategories !== null) {
           let custom = JSON.parse(savedCustomCategories);
-          // Also migrate custom categories list if it's in there
-          const migratedCustom = custom.map(cat => cat === 'Wisconsin Trip' ? 'Vacation' : cat);
-          setCustomCategories(migratedCustom);
+          setCustomCategories(custom);
         }
       } catch (error) {
         console.error('Failed to load spending data:', error);
@@ -125,44 +101,9 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       legendFontSize: 14,
     },
     {
-      name: 'Utilities',
-      baseAmount: 100,
-      color: '#FFD700',  // Gold
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Transportation',
-      baseAmount: 100,
-      color: '#00FF7F',  // Spring Green
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
       name: 'Entertainment',
       baseAmount: 100,
       color: '#FF1493',  // Deep Pink
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Dining Out',
-      baseAmount: 100,
-      color: '#6A5ACD',  // Slate Blue
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Healthcare',
-      baseAmount: 100,
-      color: '#FF8C00',  // Dark Orange
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Vacation',
-      baseAmount: 100,
-      color: '#8B00FF',  // Electric Violet
       legendFontColor: '#32CD32',
       legendFontSize: 14,
     },
@@ -190,10 +131,50 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     labelColor: (opacity = 1) => `rgba(50, 205, 50, ${opacity})`,
   };
 
+  // Helper to check if a date falls within the selected time range
+  const isWithinTimeRange = (dateString, range) => {
+    if (!range || range === 'All Time') return true;
+    if (!dateString || dateString === '-') return false;
+
+    // The stored format is "MMM D, YYYY" (e.g., "Dec 20, 2026")
+    // Javascript's Date constructor can parse this format
+    const itemDate = new Date(dateString);
+    if (isNaN(itemDate.getTime())) return true; // Fallback if parsing fails
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (range === 'Today') {
+      return itemDate >= startOfToday;
+    }
+
+    if (range === 'This Week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as start of week
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diff);
+      startOfWeek.setHours(0, 0, 0, 0);
+      return itemDate >= startOfWeek;
+    }
+
+    if (range === 'This Month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return itemDate >= startOfMonth;
+    }
+
+    if (range === 'This Year') {
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      return itemDate >= startOfYear;
+    }
+
+    return true;
+  };
+
   // Calculate dynamic totals for each category
   const calculateCategoryTotal = (categoryName) => {
     const items = categoryItems[categoryName] || [];
-    return items.reduce((sum, item) => sum + item.amount, 0);
+    return items
+      .filter(item => isWithinTimeRange(item.date, timeRange))
+      .reduce((sum, item) => sum + item.amount, 0);
   };
 
   // Get all active categories (those with items OR are custom categories)
@@ -204,12 +185,12 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Build spending data from active categories
   const allSpendingData = [
     ...baseSpendingData
-      .filter(item => activeCategoryNames.includes(item.name))
       .map(item => ({
         ...item,
         amount: calculateCategoryTotal(item.name),
-      })),
-    // Include ALL custom categories, even if they have no items yet
+      }))
+      .filter(item => item.amount > 0),
+    // Include custom categories if they have spending in the range
     ...customCategories
       .map(category => ({
         name: category.name,
@@ -217,14 +198,12 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
         color: category.color,
         legendFontColor: '#32CD32',
         legendFontSize: 14,
-      })),
+      }))
+      .filter(item => item.amount > 0),
   ];
 
-  // Update spending data with calculated totals
-  const updatedSpendingData = allSpendingData;
-
   // Sort spending data in descending order
-  const sortedSpendingData = [...updatedSpendingData].sort((a, b) => b.amount - a.amount);
+  const sortedSpendingData = [...allSpendingData].sort((a, b) => b.amount - a.amount);
 
   const totalSpending = sortedSpendingData.reduce((sum, item) => sum + item.amount, 0);
 
@@ -247,8 +226,10 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Get itemized data for a category
   const getItemizedData = (category) => {
     const items = categoryItems[category] || [];
-    // Sort items in descending order by amount
-    return items.sort((a, b) => b.amount - a.amount);
+    // Filter and sort items
+    return items
+      .filter(item => isWithinTimeRange(item.date, timeRange))
+      .sort((a, b) => b.amount - a.amount);
   };
 
   const handleCategoryPress = (category) => {
@@ -535,8 +516,54 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       <View style={styles.backgroundPattern} />
       <ScrollView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Gripah</Text>
-          <Text style={styles.totalText}>Total: {currencySymbol}{totalSpending.toLocaleString()}</Text>
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalLabel}>Total:</Text>
+            <Text style={styles.totalAmountText}>{currencySymbol}{totalSpending.toLocaleString()}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.filterContainer}
+            onPress={() => setTimeRangeModalVisible(true)}
+          >
+            <Text style={styles.timeRangeText}>{timeRange}</Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </TouchableOpacity>
+
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={timeRangeModalVisible}
+            onRequestClose={() => setTimeRangeModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.timeRangeModalOverlay}
+              activeOpacity={1}
+              onPress={() => setTimeRangeModalVisible(false)}
+            >
+              <View style={styles.timeRangeMenu}>
+                {['Today', 'This Week', 'This Month', 'This Year', 'All Time'].map((range) => (
+                  <TouchableOpacity
+                    key={range}
+                    style={[
+                      styles.timeRangeOption,
+                      timeRange === range && styles.timeRangeOptionSelected
+                    ]}
+                    onPress={() => {
+                      setTimeRange(range);
+                      setTimeRangeModalVisible(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.timeRangeOptionText,
+                      timeRange === range && styles.timeRangeOptionTextSelected
+                    ]}>
+                      {range}
+                    </Text>
+                    {timeRange === range && <Text style={styles.checkIcon}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
         </View>
 
         <View style={styles.chartContainer}>
@@ -865,20 +892,96 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(42, 42, 42, 0.85)',
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 3,
     borderBottomWidth: 1,
     borderBottomColor: '#32CD32',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#32CD32',
-    marginBottom: 10,
+  filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 140,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#32CD32',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  totalText: {
-    fontSize: 18,
+  timeRangeText: {
     color: '#32CD32',
+    fontSize: 14,
     fontWeight: '600',
+  },
+  dropdownArrow: {
+    color: '#32CD32',
+    fontSize: 10,
+    marginLeft: 8,
+  },
+  timeRangeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeRangeMenu: {
+    backgroundColor: '#1a1a1a',
+    width: '80%',
+    borderRadius: 16,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: '#32CD32',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  timeRangeOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  timeRangeOptionSelected: {
+    backgroundColor: 'rgba(50, 205, 50, 0.15)',
+  },
+  timeRangeOptionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  timeRangeOptionTextSelected: {
+    color: '#32CD32',
+    fontWeight: '700',
+  },
+  checkIcon: {
+    color: '#32CD32',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  totalContainer: {
+    alignItems: 'flex-start',
+  },
+  totalLabel: {
+    fontSize: 12,
+    color: '#32CD32',
+    fontStyle: 'italic',
+    textDecorationLine: 'underline',
+    marginBottom: -4, // Pull amount slightly closer
+  },
+  totalAmountText: {
+    fontSize: 36,
+    color: '#32CD32',
+    fontWeight: '800',
+    textAlign: 'left',
   },
   chartContainer: {
     alignItems: 'flex-start',
