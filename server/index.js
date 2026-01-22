@@ -1,10 +1,54 @@
 require('dotenv').config();
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
 const cors = require('cors');
 
+let stripe;
+let publishableKey;
 const app = express();
+
+// AWS Secrets Manager setup
+const secretsClient = new SecretsManagerClient({
+    region: process.env.AWS_REGION || "us-east-1",
+});
+
+async function getSecret(secretName) {
+    console.log(`Fetching AWS secret: ${secretName}`);
+    try {
+        const response = await secretsClient.send(
+            new GetSecretValueCommand({
+                SecretId: secretName,
+            })
+        );
+        const secret = response.SecretString;
+
+        // AWS Secrets Manager often stores values as JSON strings.
+        // If it's JSON, extract the value for the key that matches the secret name.
+        try {
+            const parsed = JSON.parse(secret);
+            if (parsed[secretName]) {
+                console.log(`Successfully parsed JSON secret for ${secretName}`);
+                return parsed[secretName];
+            }
+            // If it's JSON but doesn't have the key, it might be the only key in the object
+            const keys = Object.keys(parsed);
+            if (keys.length === 1) {
+                console.log(`Successfully parsed single-key JSON secret for ${secretName}`);
+                return parsed[keys[0]];
+            }
+            console.log(`Secret for ${secretName} is JSON but format is unexpected. Returning as string.`);
+            return secret;
+        } catch (e) {
+            // Not JSON, return as is
+            return secret;
+        }
+    } catch (error) {
+        console.error(`Error fetching secret ${secretName} from AWS:`, error);
+        return null; // Let the caller decide fallback
+    }
+}
+
 
 // Use JSON for all routes
 app.use(express.json());
@@ -43,9 +87,22 @@ app.get('/', (req, res) => {
     res.send('Gripah Backend is running with Cognito Auth.');
 });
 
+// Endpoint for frontend to get Stripe configuration
+app.get('/stripe-config', (req, res) => {
+    if (!publishableKey) {
+        return res.status(503).send({ error: "Stripe configuration not yet available" });
+    }
+    res.send({ publishableKey });
+});
+
 // Create Stripe Checkout Session (for Subscriptions)
 app.post('/create-subscription', checkJwt, async (req, res) => {
+    if (!stripe) {
+        console.error('Stripe client not initialized');
+        return res.status(503).send({ error: { message: "Stripe service is not initialized on the server. Check AWS secret configuration." } });
+    }
     const { email, priceId } = req.body;
+
     const userId = req.userId;
 
     try {
@@ -79,7 +136,9 @@ app.post('/create-subscription', checkJwt, async (req, res) => {
         res.send({
             subscriptionId: subscription.id,
             clientSecret: subscription.latest_invoice.payment_intent.client_secret,
+            customerId: customer.id,
         });
+
     } catch (error) {
         console.error('Error creating subscription:', error);
         res.status(400).send({ error: { message: error.message } });
@@ -174,5 +233,33 @@ app.get('/subscription-status', checkJwt, async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Initialize and start server
+async function init() {
+    try {
+        const isProd = process.env.NODE_ENV === 'production';
+        const secKeyName = isProd ? 'StripeSecLiveKey' : 'StripeSecTestKey';
+        const pubKeyName = isProd ? 'StripePubLiveKey' : 'StripePubTestKey';
+
+        const stripeSecretKey = await getSecret(secKeyName) || process.env.STRIPE_SECRET_KEY;
+        publishableKey = await getSecret(pubKeyName) || process.env.STRIPE_PUBLISHABLE_KEY;
+
+        if (!stripeSecretKey) {
+            throw new Error(`Stripe secret key not found. Tried secret: ${secKeyName} and env: STRIPE_SECRET_KEY`);
+        }
+
+        stripe = require('stripe')(stripeSecretKey);
+
+        const PORT = process.env.PORT || 3000;
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Stripe Secret Key loaded from: ${stripeSecretKey === process.env.STRIPE_SECRET_KEY ? 'Environment' : 'AWS'}`);
+            console.log(`Stripe Pub Key loaded from: ${publishableKey === process.env.STRIPE_PUBLISHABLE_KEY ? 'Environment' : 'AWS'}`);
+        });
+    } catch (error) {
+        console.error('Failed to initialize server:', error);
+        process.exit(1);
+    }
+}
+
+init();

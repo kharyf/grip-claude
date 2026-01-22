@@ -31,7 +31,9 @@ try {
   console.error('Amplify configuration failed:', e.name, e.message);
 }
 
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
+const API_URL = 'http://192.168.1.227:3000';
+const FALLBACK_STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
+
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -255,16 +257,49 @@ function AppContent() {
 }
 
 export default function App() {
+  const [stripePubKey, setStripePubKey] = useState(null);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        console.log('Fetching Stripe config from server...');
+        const response = await fetch(`${API_URL}/stripe-config`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json();
+        if (data.publishableKey) {
+          console.log('Stripe pub key loaded from server');
+          setStripePubKey(data.publishableKey);
+        } else {
+          throw new Error('No publishable key in response');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch Stripe config from server, using fallback:', error.message);
+        setStripePubKey(FALLBACK_STRIPE_PUBLISHABLE_KEY);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  if (!stripePubKey) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#2a2a2a', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#32CD32', fontSize: 32, fontWeight: 'bold' }}>Gripah</Text>
+        <Text style={{ color: '#32CD32', marginTop: 10 }}>Initializing...</Text>
+      </View>
+    );
+  }
+
   return (
     <AuthProvider>
       <SubscriptionProvider>
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+        <StripeProvider publishableKey={stripePubKey}>
           <AppContent />
         </StripeProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

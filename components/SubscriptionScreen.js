@@ -1,61 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { useStripe } from '@stripe/stripe-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 
-const API_URL = 'http://localhost:3000'; // Replace in production
+const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00';
 
 const SubscriptionScreen = () => {
-    const { initPaymentSheet, presentPaymentSheet } = useStripe();
-    const { user, token } = useAuth();
     const { checkStatus } = useSubscription();
     const [loading, setLoading] = useState(false);
 
-    const fetchPaymentSheetParams = async () => {
-        const response = await fetch(`${API_URL}/create-subscription`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                email: user.email,
-                priceId: 'price_YOUR_PRICE_ID', // Replace with actual Stripe Price ID
-            }),
-        });
-        const { clientSecret, customer } = await response.json();
-
-        return {
-            paymentIntentClientSecret: clientSecret,
-            customer,
-        };
-    };
-
     const subscribe = async () => {
         setLoading(true);
-        const { paymentIntentClientSecret, customer } = await fetchPaymentSheetParams();
-
-        const { error } = await initPaymentSheet({
-            paymentIntentClientSecret,
-            customerId: customer,
-            merchantDisplayName: 'Gripah',
-            allowsDelayedPaymentMethods: true,
-        });
-
-        if (!error) {
-            const { sessionError } = await presentPaymentSheet();
-            if (sessionError) {
-                Alert.alert(`Error code: ${sessionError.code}`, sessionError.message);
+        try {
+            const supported = await Linking.canOpenURL(STRIPE_PAYMENT_LINK);
+            if (supported) {
+                await Linking.openURL(STRIPE_PAYMENT_LINK);
+                // After opening the link, we can't easily track completion directly in-app
+                // without a deep link callback, but we can tell the user what to do.
+                Alert.alert(
+                    'Subscription',
+                    'We are opening the Stripe payment page. Please complete your subscription there and return to the app.',
+                    [{ text: 'OK', onPress: () => checkStatus() }]
+                );
             } else {
-                Alert.alert('Success', 'Your subscription is active!');
-                checkStatus();
+                Alert.alert('Error', "Cannot open the payment link. Please check your internet connection.");
             }
-        } else {
-            Alert.alert(`Error code: ${error.code}`, error.message);
+        } catch (err) {
+            Alert.alert('Error', err.message);
+            console.error(err);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
+
 
     return (
         <View style={styles.container}>
