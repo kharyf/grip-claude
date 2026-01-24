@@ -3,18 +3,24 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Lin
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 
-const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00';
+const STRIPE_PAYMENT_LINK = process.env.EXPO_PUBLIC_STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00';
 
 const SubscriptionScreen = () => {
+    const { user } = useAuth();
     const { checkStatus } = useSubscription();
     const [loading, setLoading] = useState(false);
 
     const subscribe = async () => {
         setLoading(true);
         try {
-            const supported = await Linking.canOpenURL(STRIPE_PAYMENT_LINK);
+            const email = user?.attributes?.email;
+            const paymentUrl = email
+                ? `${STRIPE_PAYMENT_LINK}?locked_prefilled_email=${encodeURIComponent(email)}`
+                : STRIPE_PAYMENT_LINK;
+
+            const supported = await Linking.canOpenURL(paymentUrl);
             if (supported) {
-                await Linking.openURL(STRIPE_PAYMENT_LINK);
+                await Linking.openURL(paymentUrl);
                 // After opening the link, we can't easily track completion directly in-app
                 // without a deep link callback, but we can tell the user what to do.
                 Alert.alert(

@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
                 ...currentUser,
                 attributes: attributes
             });
-            setToken(session.tokens?.accessToken?.toString() || null);
+            setToken(session.tokens?.idToken?.toString() || null);
         } catch (e) {
             setUser(null);
             setToken(null);

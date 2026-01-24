@@ -109,17 +109,31 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
         {/* Subscription Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Subscription</Text>
-          <Text style={styles.settingDescription}>Upgrade to Premium to remove all advertisements from the app.</Text>
+          {status === 'active' ? (
+            <Text style={styles.settingDescription}>You are currently enjoying a Premium ad-free experience.</Text>
+          ) : (
+            <Text style={styles.settingDescription}>Upgrade to Premium to remove all advertisements from the app.</Text>
+          )}
           <View style={[styles.settingItem, { marginTop: 10 }]}>
             <Text style={styles.settingLabel}>Status</Text>
             <Text style={[
               styles.statusText,
               status === 'active' ? styles.activeStatus : (subscription?.status === 'past_due' ? styles.warningStatus : styles.inactiveStatus)
             ]}>
-              {status === 'active' ? (subscription?.status === 'trialing' ? 'Premium (Trial)' : 'Premium') : (subscription?.status === 'past_due' ? 'Past Due' : 'Free')}
+              {status === 'active' ? 'Premium' : (subscription?.status === 'past_due' ? 'Past Due' : 'Free')}
             </Text>
           </View>
-          {status !== 'active' && <SubscriptionScreen />}
+          {status !== 'active' ? (
+            <SubscriptionScreen />
+          ) : (
+            <View style={styles.unsubscribeSection}>
+              <TouchableOpacity
+                onPress={() => Alert.alert('Unsubscribe', 'Please manage your subscription through your App Store or Play Store account settings.')}
+              >
+                <Text style={styles.unsubscribeText}>Unsubscribe</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Account Section */}
@@ -348,6 +362,16 @@ const styles = StyleSheet.create({
   },
   warningStatus: {
     color: '#FFCC00',
+  },
+  unsubscribeSection: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  unsubscribeText: {
+    color: '#32CD32',
+    fontSize: 12,
+    opacity: 0.4,
+    textDecorationLine: 'underline',
   },
 });
 

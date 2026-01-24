@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
 const cors = require('cors');
 
 let stripe;
@@ -12,6 +14,12 @@ const app = express();
 const secretsClient = new SecretsManagerClient({
     region: process.env.AWS_REGION || "us-east-1",
 });
+
+// DynamoDB client setup
+const dynamoClient = new DynamoDBClient({
+    region: process.env.AWS_REGION || "us-east-1",
+});
+const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 async function getSecret(secretName) {
     console.log(`Fetching AWS secret: ${secretName}`);
@@ -57,7 +65,7 @@ app.use(cors());
 // Cognito JWT Verifier
 const verifier = CognitoJwtVerifier.create({
     userPoolId: process.env.COGNITO_USER_POOL_ID,
-    tokenUse: "access",
+    tokenUse: "id",
     clientId: process.env.COGNITO_CLIENT_ID,
 });
 
@@ -193,6 +201,44 @@ app.post('/webhook', async (req, res) => {
     }
 
     res.send({ received: true });
+});
+
+// Premium status endpoint (DynamoDB based)
+app.get('/premium-status', checkJwt, async (req, res) => {
+    console.log('JWT Payload:', JSON.stringify(req.user, null, 2));
+    const email = req.user.email || req.user['cognito:username'] || req.user.sub;
+
+    if (!email) {
+        console.error('Email not found in JWT payload');
+        return res.status(400).send({ error: "Email not found in token." });
+    }
+    console.log(`Checking premium status for: ${email}`);
+
+    try {
+        const command = new GetCommand({
+            TableName: "GripahTest2",
+            Key: {
+                email: email
+            }
+        });
+
+        const response = await docClient.send(command);
+
+        if (response.Item) {
+            console.log(`Found item for ${email}:`, JSON.stringify(response.Item, null, 2));
+            const isPremium = response.Item.premium_status === true || response.Item.premium_status === 'true' || response.Item.premium_status === 1;
+            res.send({
+                isPremium: isPremium,
+                details: response.Item
+            });
+        } else {
+            console.log(`User ${email} not found in GripahTest2 table`);
+            res.send({ isPremium: false, message: "User not found in premium table" });
+        }
+    } catch (error) {
+        console.error('Error fetching premium status from DynamoDB:', error);
+        res.status(500).send({ error: 'Internal Server Error check DynamoDB' });
+    }
 });
 
 // Subscription status endpoint

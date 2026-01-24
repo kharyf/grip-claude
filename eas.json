@@ -6,14 +6,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "autoIncrement": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "autoIncrement": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "distribution": "store"
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/fZueVcdivcgC0n03962B200"
+      }
     }
   },
   "submit": {

@@ -233,7 +233,7 @@ function AppContent() {
             </View>
 
             <View style={styles.menuItem}>
-              <Text style={styles.menuIcon}>💎</Text>
+              <Text style={styles.menuIcon}>{status === 'active' ? '💎' : '👍'}</Text>
               <Text style={styles.menuText}>
                 {status === 'active' ? 'Premium User' : 'Free User'}
               </Text>

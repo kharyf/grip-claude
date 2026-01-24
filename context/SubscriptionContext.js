@@ -22,7 +22,7 @@ export const SubscriptionProvider = ({ children }) => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-            const response = await fetch(`${API_URL}/subscription-status`, {
+            const response = await fetch(`${API_URL}/premium-status`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -36,11 +36,8 @@ export const SubscriptionProvider = ({ children }) => {
             }
 
             const data = await response.json();
-            setStatus(data.status);
-            setSubscription({
-                status: data.stripeStatus,
-                id: data.subscriptionId
-            });
+            setStatus(data.isPremium ? 'active' : 'none');
+            setSubscription(data.details || null);
         } catch (error) {
             // Log error but don't crash, and keep status at 'none'
             console.log('Subscription check skipped (server likely not reachable on this network):', error.message);
