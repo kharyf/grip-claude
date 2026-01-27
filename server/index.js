@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
 const cors = require('cors');
 
 let stripe;
@@ -15,11 +13,8 @@ const secretsClient = new SecretsManagerClient({
     region: process.env.AWS_REGION || "us-east-1",
 });
 
-// DynamoDB client setup
-const dynamoClient = new DynamoDBClient({
-    region: process.env.AWS_REGION || "us-east-1",
-});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+// API Gateway configuration
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage";
 
 async function getSecret(secretName) {
     console.log(`Fetching AWS secret: ${secretName}`);
@@ -203,41 +198,60 @@ app.post('/webhook', async (req, res) => {
     res.send({ received: true });
 });
 
-// Premium status endpoint (DynamoDB based)
-app.get('/premium-status', checkJwt, async (req, res) => {
+// Premium user endpoint (API Gateway + Lambda based)
+app.get('/premium-user', checkJwt, async (req, res) => {
     console.log('JWT Payload:', JSON.stringify(req.user, null, 2));
-    const email = req.user.email || req.user['cognito:username'] || req.user.sub;
+    const email = req.query.email || req.user.email || req.user['cognito:username'] || req.user.sub;
 
     if (!email) {
         console.error('Email not found in JWT payload');
         return res.status(400).send({ error: "Email not found in token." });
     }
-    console.log(`Checking premium status for: ${email}`);
+    const targetUrl = `${API_GATEWAY_URL}?email=${encodeURIComponent(email)}`;
+    console.log(`[Debug] Calling API Gateway: ${targetUrl}`);
 
     try {
-        const command = new GetCommand({
-            TableName: "GripahTest2",
-            Key: {
-                email: email
+        // Call the API Gateway + Lambda
+        const response = await fetch(targetUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': req.headers.authorization, // Forward the token if needed
+                'Content-Type': 'application/json'
             }
         });
 
-        const response = await docClient.send(command);
-
-        if (response.Item) {
-            console.log(`Found item for ${email}:`, JSON.stringify(response.Item, null, 2));
-            const isPremium = response.Item.premium_status === true || response.Item.premium_status === 'true' || response.Item.premium_status === 1;
-            res.send({
-                isPremium: isPremium,
-                details: response.Item
-            });
-        } else {
-            console.log(`User ${email} not found in GripahTest2 table`);
-            res.send({ isPremium: false, message: "User not found in premium table" });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[Error] API Gateway returned error: ${response.status} ${errorText}`);
+            return res.status(response.status).send({ error: 'Error calling premium user service' });
         }
+
+        const rawData = await response.text();
+        console.log(`[Debug] Raw API Gateway response: ${rawData}`);
+
+        let data;
+        try {
+            data = JSON.parse(rawData);
+        } catch (e) {
+            console.error(`[Error] Failed to parse API Gateway response as JSON: ${e.message}`);
+            return res.status(500).send({ error: 'Invalid response from premium user service' });
+        }
+
+        console.log(`[Debug] Parsed data for ${email}:`, JSON.stringify(data, null, 2));
+
+        // Use the premium_user field from the API Gateway response
+        const isPremium = data.premium_user === true || data.premium_user === 'true';
+
+        console.log(`[Debug] Final isPremium determination for ${email}: ${isPremium}`);
+
+        res.send({
+            isPremium: isPremium,
+            details: data.details || data
+        });
+
     } catch (error) {
-        console.error('Error fetching premium status from DynamoDB:', error);
-        res.status(500).send({ error: 'Internal Server Error check DynamoDB' });
+        console.error('Error fetching premium status via API Gateway:', error);
+        res.status(500).send({ error: 'Internal Server Error' });
     }
 });
 

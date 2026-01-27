@@ -4,11 +4,12 @@ import { useAuth } from './AuthContext';
 const SubscriptionContext = createContext();
 
 export const SubscriptionProvider = ({ children }) => {
-    const { token } = useAuth();
+    const { token, user } = useAuth();
     const [status, setStatus] = useState('none'); // 'none', 'active', 'loading'
     const [subscription, setSubscription] = useState(null);
+    const [lastLoggedEmail, setLastLoggedEmail] = useState(null);
 
-    const API_URL = 'http://192.168.1.227:3000'; // Updated for device connectivity
+    const API_STAGE_URL = process.env.EXPO_PUBLIC_API_STAGE_URL || 'https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage';
 
     const checkStatus = async () => {
         if (!token) {
@@ -22,7 +23,12 @@ export const SubscriptionProvider = ({ children }) => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-            const response = await fetch(`${API_URL}/premium-status`, {
+            const email = user?.attributes?.email;
+            const url = email
+                ? `${API_STAGE_URL}/premium-user?email=${encodeURIComponent(email)}`
+                : `${API_STAGE_URL}/premium-user`;
+
+            const response = await fetch(url, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -36,7 +42,9 @@ export const SubscriptionProvider = ({ children }) => {
             }
 
             const data = await response.json();
-            setStatus(data.isPremium ? 'active' : 'none');
+            // API Gateway returns premium_user field
+            const isPremiumUser = data.premium_user === true || data.premium_user === 'true';
+            setStatus(isPremiumUser ? 'active' : 'none');
             setSubscription(data.details || null);
         } catch (error) {
             // Log error but don't crash, and keep status at 'none'
@@ -48,6 +56,22 @@ export const SubscriptionProvider = ({ children }) => {
     useEffect(() => {
         checkStatus();
     }, [token]);
+
+    useEffect(() => {
+        const currentEmail = user?.attributes?.email;
+
+        // Login detected
+        if (token && status !== 'loading' && currentEmail && currentEmail !== lastLoggedEmail) {
+            console.log(`[Auth] User logged in: ${currentEmail}, Premium User: ${status}`);
+            setLastLoggedEmail(currentEmail);
+        }
+
+        // Logout detected
+        if (!token && lastLoggedEmail) {
+            console.log(`[Auth] User logged out: ${lastLoggedEmail}`);
+            setLastLoggedEmail(null);
+        }
+    }, [token, status, user, lastLoggedEmail]);
 
     return (
         <SubscriptionContext.Provider value={{ status, subscription, checkStatus }}>
