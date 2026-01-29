@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
@@ -116,7 +116,55 @@ function AppContent() {
     error: authError,
     needsConfirmation,
   } = useAuth();
-  const { status } = useSubscription();
+  const { status, checkStatus } = useSubscription();
+
+  useEffect(() => {
+    const handleDeepLink = async ({ url }) => {
+      console.log('Deep link received:', url);
+      if (url) {
+        try {
+          const urlObj = new URL(url);
+          const sessionId = urlObj.searchParams.get('session_id');
+          
+          if (url.includes('payment-success')) {
+            console.log('Payment success detected', sessionId ? `Session: ${sessionId}` : '');
+            // Wait a moment for webhook to process
+            setTimeout(async () => {
+              await checkStatus();
+              Alert.alert(
+                "Subscription Successful", 
+                "Thank you for subscribing! Your premium features are now active.",
+                [{ text: "OK", onPress: () => setActiveTab('Settings') }]
+              );
+            }, 2000);
+          } else if (url.includes('payment-cancel')) {
+            const cancelReason = urlObj.searchParams.get('reason') || 'The subscription process was cancelled.';
+            Alert.alert("Subscription Cancelled", cancelReason);
+          } else if (sessionId) {
+            // Handle any Stripe checkout session return
+            console.log('Stripe session detected:', sessionId);
+            setTimeout(() => checkStatus(), 1500);
+          }
+        } catch (error) {
+          console.error('Error processing deep link:', error);
+        }
+      }
+    };
+
+    // Check for initial URL (cold start)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    }).catch(error => {
+      console.error('Error getting initial URL:', error);
+    });
+
+    // Add listener (warm start)
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const userEmail = user?.attributes?.email || user?.username || '';
   const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : '👤';

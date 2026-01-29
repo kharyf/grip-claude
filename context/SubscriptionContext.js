@@ -9,7 +9,7 @@ export const SubscriptionProvider = ({ children }) => {
     const [subscription, setSubscription] = useState(null);
     const [lastLoggedEmail, setLastLoggedEmail] = useState(null);
 
-    const API_STAGE_URL = process.env.EXPO_PUBLIC_API_STAGE_URL || 'https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage';
+    const API_STAGE_URL = 'https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage';
 
     const checkStatus = async () => {
         if (!token) {
@@ -24,9 +24,7 @@ export const SubscriptionProvider = ({ children }) => {
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
             const email = user?.attributes?.email;
-            const url = email
-                ? `${API_STAGE_URL}/premium-user?email=${encodeURIComponent(email)}`
-                : `${API_STAGE_URL}/premium-user`;
+            const url = `${API_STAGE_URL}?email=${encodeURIComponent(email)}`;
 
             const response = await fetch(url, {
                 headers: {

@@ -20,7 +20,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app needs access to your camera to scan receipts and automatically add spending items.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select receipt images for scanning."
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select receipt images for scanning.",
+        "LSApplicationQueriesSchemes": ["gripah"]
       }
     },
     "android": {
@@ -35,6 +36,15 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": {
+            "scheme": "gripah"
+          }
+        }
       ]
     },
     "web": {

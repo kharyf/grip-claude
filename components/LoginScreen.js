@@ -139,6 +139,7 @@ const LoginScreen = ({ onLogin, onSignUp, onForgotPassword, onConfirmAccount, er
             <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
+                    testID="email-input"
                     style={styles.input}
                     placeholder="Enter your email"
                     placeholderTextColor="#666"
@@ -153,6 +154,7 @@ const LoginScreen = ({ onLogin, onSignUp, onForgotPassword, onConfirmAccount, er
             <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <TextInput
+                    testID="password-input"
                     style={styles.input}
                     placeholder="Enter your password"
                     placeholderTextColor="#666"

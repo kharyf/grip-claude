@@ -127,19 +127,31 @@ app.post('/create-subscription', checkJwt, async (req, res) => {
             });
         }
 
-        // 2. Create Subscription
-        const subscription = await stripe.subscriptions.create({
+        // 2. Create Checkout Session
+        const session = await stripe.checkout.sessions.create({
             customer: customer.id,
-            items: [{ price: priceId }],
-            payment_behavior: 'default_incomplete',
-            payment_settings: { save_default_payment_method: 'on_subscription' },
-            expand: ['latest_invoice.payment_intent'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            success_url: 'gripah://payment-success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url: 'gripah://payment-cancel?reason=Payment+cancelled',
+            metadata: {
+                cognitoId: userId
+            },
+            allow_promotion_codes: true,
+            billing_address_collection: 'auto',
+            customer_update: {
+                address: 'auto',
+                name: 'auto',
+            },
         });
 
         res.send({
-            subscriptionId: subscription.id,
-            clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-            customerId: customer.id,
+            url: session.url
         });
 
     } catch (error) {
@@ -148,26 +160,41 @@ app.post('/create-subscription', checkJwt, async (req, res) => {
     }
 });
 
-// Webhook handler - Adapted for Amazon EventBridge
+// Webhook handler - Enhanced for payment confirmation
 app.post('/webhook', async (req, res) => {
     let event;
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     try {
-        event = req.body.detail || req.body;
+        // Try Stripe signature verification first if webhook secret is available
+        if (webhookSecret && sig) {
+            const stripe = require('stripe')(await getSecret('StripeSecTestKey') || process.env.STRIPE_SECRET_KEY);
+            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        } else {
+            // Fallback to EventBridge format or direct body
+            event = req.body.detail || req.body;
 
-        if (!event || !event.type) {
-            throw new Error('Invalid EventBridge payload: missing event type');
+            if (!event || !event.type) {
+                throw new Error('Invalid webhook payload: missing event type');
+            }
         }
     } catch (err) {
-        console.error(`EventBridge Processing Error: ${err.message}`);
-        return res.status(400).send(`EventBridge Processing Error: ${err.message}`);
+        console.error(`Webhook signature verification failed: ${err.message}`);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     // Handle the event
     switch (event.type) {
         case 'checkout.session.completed':
             const session = event.data.object;
-            console.log(`Checkout completed for customer: ${session.customer}`);
+            const cognitoId = session.metadata?.cognitoId;
+            console.log(`Checkout completed for customer: ${session.customer}, cognitoId: ${cognitoId}`);
+            
+            // Store subscription completion for later retrieval
+            if (cognitoId) {
+                console.log(`Payment successful for user ${cognitoId}, session ${session.id}`);
+            }
             break;
 
         case 'invoice.paid':
@@ -181,9 +208,18 @@ app.post('/webhook', async (req, res) => {
             break;
 
         case 'customer.subscription.created':
+            const subCreated = event.data.object;
+            console.log(`Subscription ${subCreated.id} created. Status: ${subCreated.status}`);
+            break;
+
         case 'customer.subscription.updated':
             const subUpdated = event.data.object;
             console.log(`Subscription ${subUpdated.id} updated. Status: ${subUpdated.status}`);
+            
+            // Update subscription status in the customer metadata if needed
+            if (subUpdated.metadata?.cognitoId) {
+                console.log(`Subscription updated for user ${subUpdated.metadata.cognitoId}`);
+            }
             break;
 
         case 'customer.subscription.deleted':
@@ -195,7 +231,7 @@ app.post('/webhook', async (req, res) => {
             console.log(`Unhandled event type ${event.type}`);
     }
 
-    res.send({ received: true });
+    res.json({ received: true });
 });
 
 // Premium user endpoint (API Gateway + Lambda based)

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Lin
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 
+// Use your Stripe Payment Link directly
 const STRIPE_PAYMENT_LINK = process.env.EXPO_PUBLIC_STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00';
 
 const SubscriptionScreen = () => {
@@ -14,22 +15,28 @@ const SubscriptionScreen = () => {
         setLoading(true);
         try {
             const email = user?.attributes?.email;
-            const paymentUrl = email
-                ? `${STRIPE_PAYMENT_LINK}?locked_prefilled_email=${encodeURIComponent(email)}`
-                : STRIPE_PAYMENT_LINK;
+            const cognitoUsername = user?.username;
+
+            // Build payment URL with prefilled email and client_reference_id
+            let paymentUrl = STRIPE_PAYMENT_LINK;
+            const params = [];
+
+            if (email) {
+                params.push(`locked_prefilled_email=${encodeURIComponent(email)}`);
+            }
+            if (cognitoUsername) {
+                params.push(`client_reference_id=${encodeURIComponent(cognitoUsername)}`);
+            }
+
+            if (params.length > 0) {
+                paymentUrl = `${STRIPE_PAYMENT_LINK}?${params.join('&')}`;
+            }
 
             const supported = await Linking.canOpenURL(paymentUrl);
             if (supported) {
                 await Linking.openURL(paymentUrl);
-                // After opening the link, we can't easily track completion directly in-app
-                // without a deep link callback, but we can tell the user what to do.
-                Alert.alert(
-                    'Subscription',
-                    'We are opening the Stripe payment page. Please complete your subscription there and return to the app.',
-                    [{ text: 'OK', onPress: () => checkStatus() }]
-                );
             } else {
-                Alert.alert('Error', "Cannot open the payment link. Please check your internet connection.");
+                Alert.alert('Error', "Cannot open the payment link.");
             }
         } catch (err) {
             Alert.alert('Error', err.message);
