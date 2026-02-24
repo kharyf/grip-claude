@@ -215,6 +215,7 @@ const LoginScreen = ({ onLogin, onSignUp, onForgotPassword, onConfirmAccount, er
             <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
+                    testID="email-input"
                     style={styles.input}
                     placeholder="Enter your email"
                     placeholderTextColor="#666"
@@ -229,6 +230,7 @@ const LoginScreen = ({ onLogin, onSignUp, onForgotPassword, onConfirmAccount, er
             <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <TextInput
+                    testID="password-input"
                     style={styles.input}
                     placeholder="At least 8 characters"
                     placeholderTextColor="#666"
@@ -241,6 +243,7 @@ const LoginScreen = ({ onLogin, onSignUp, onForgotPassword, onConfirmAccount, er
             <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Confirm Password</Text>
                 <TextInput
+                    testID="confirm-password-input"
                     style={styles.input}
                     placeholder="Re-enter your password"
                     placeholderTextColor="#666"

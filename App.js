@@ -19,6 +19,13 @@ const amplifyConfig = {
       userPoolId: 'us-east-1_ep4c0DVRU',
       userPoolClientId: '2rbspi5nhednfsjhp7t2h3lcei',
     }
+  },
+  API: {
+    GraphQL: {
+      endpoint: 'https://vazdot6eijdnln5xjvfu2typge.appsync-api.us-east-1.amazonaws.com/graphql',
+      region: 'us-east-1',
+      defaultAuthMode: 'userPool', // Uses Cognito ID token automatically
+    }
   }
 };
 
@@ -125,14 +132,14 @@ function AppContent() {
         try {
           const urlObj = new URL(url);
           const sessionId = urlObj.searchParams.get('session_id');
-          
+
           if (url.includes('payment-success')) {
             console.log('Payment success detected', sessionId ? `Session: ${sessionId}` : '');
             // Wait a moment for webhook to process
             setTimeout(async () => {
               await checkStatus();
               Alert.alert(
-                "Subscription Successful", 
+                "Subscription Successful",
                 "Thank you for subscribing! Your premium features are now active.",
                 [{ text: "OK", onPress: () => setActiveTab('Settings') }]
               );
