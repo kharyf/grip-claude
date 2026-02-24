@@ -42,7 +42,9 @@ export const SubscriptionProvider = ({ children }) => {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
             const email = user?.attributes?.email;
-            const url = `${API_STAGE_URL}?email=${encodeURIComponent(email)}`;
+            const cognitoUsername = user?.userId;
+            const url = `${API_STAGE_URL}?cognitoUsername=${encodeURIComponent(cognitoUsername)}&email=${encodeURIComponent(email)}`;
+
 
             const response = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -54,7 +56,9 @@ export const SubscriptionProvider = ({ children }) => {
             if (!response.ok) throw new Error('Server unreachable or returned error');
 
             const data = await response.json();
-            const isPremiumUser = data.premium_user === true || data.premium_user === 'true';
+            const isPremiumUser =
+                data.premium_user === true || data.premium_user === 'true' ||
+                data.premiumUser === true || data.premiumUser === 'true';
             setStatus(isPremiumUser ? 'active' : 'none');
             setSubscription(data.details || null);
         } catch (error) {

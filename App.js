@@ -210,6 +210,7 @@ function AppContent() {
         <TouchableOpacity
           style={styles.userIconButton}
           onPress={() => setMenuVisible(true)}
+          testID="userMenuButton"
         >
           <View style={styles.userIcon}>
             <Text style={styles.userIconText}>{userInitial}</Text>

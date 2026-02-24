@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, Modal, Alert } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, Modal, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { Slider } from '@miblanchard/react-native-slider';
@@ -128,7 +128,7 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
           ) : (
             <View style={styles.unsubscribeSection}>
               <TouchableOpacity
-                onPress={() => Alert.alert('Unsubscribe', 'Please manage your subscription through your App Store or Play Store account settings.')}
+                onPress={() => Linking.openURL('https://billing.stripe.com/p/login/test_8x228qdqcg3lgeQ1xA3sI00')}
               >
                 <Text style={styles.unsubscribeText}>Unsubscribe</Text>
               </TouchableOpacity>
