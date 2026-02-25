@@ -2,6 +2,7 @@
 
 .npm-cache/
 server/.npm-cache-local/
+server/AWSCLIV2.pkg
 
 # dependencies
 node_modules/

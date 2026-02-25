@@ -1,3 +1,11 @@
+export const BASE_CATEGORIES = [
+    { name: 'Groceries', color: '#FF0000' },
+    { name: 'Rent', color: '#00CED1' },
+    { name: 'Entertainment', color: '#FF1493' },
+    { name: 'Subscriptions', color: '#1E90FF' },
+    { name: 'Savings', color: '#32CD32' },
+];
+
 export const getDefaultCategoryItems = () => {
     const formatDate = (date) =>
         date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

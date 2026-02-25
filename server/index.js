@@ -90,6 +90,11 @@ app.get('/', (req, res) => {
     res.send('Gripah Backend is running with Cognito Auth.');
 });
 
+// Health check endpoint for ECS/Fargate
+app.get('/health', (req, res) => {
+    res.status(200).send({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // Endpoint for frontend to get Stripe configuration
 app.get('/stripe-config', (req, res) => {
     if (!publishableKey) {
@@ -190,7 +195,7 @@ app.post('/webhook', async (req, res) => {
             const session = event.data.object;
             const cognitoId = session.metadata?.cognitoId;
             console.log(`Checkout completed for customer: ${session.customer}, cognitoId: ${cognitoId}`);
-            
+
             // Store subscription completion for later retrieval
             if (cognitoId) {
                 console.log(`Payment successful for user ${cognitoId}, session ${session.id}`);
@@ -215,7 +220,7 @@ app.post('/webhook', async (req, res) => {
         case 'customer.subscription.updated':
             const subUpdated = event.data.object;
             console.log(`Subscription ${subUpdated.id} updated. Status: ${subUpdated.status}`);
-            
+
             // Update subscription status in the customer metadata if needed
             if (subUpdated.metadata?.cognitoId) {
                 console.log(`Subscription updated for user ${subUpdated.metadata.cognitoId}`);
@@ -346,11 +351,20 @@ async function init() {
         stripe = require('stripe')(stripeSecretKey);
 
         const PORT = process.env.PORT || 3000;
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`Stripe Secret Key loaded from: ${stripeSecretKey === process.env.STRIPE_SECRET_KEY ? 'Environment' : 'AWS'}`);
             console.log(`Stripe Pub Key loaded from: ${publishableKey === process.env.STRIPE_PUBLISHABLE_KEY ? 'Environment' : 'AWS'}`);
+        });
+
+        // Graceful shutdown handling for Fargate
+        process.on('SIGTERM', () => {
+            console.log('SIGTERM signal received: closing HTTP server');
+            server.close(() => {
+                console.log('HTTP server closed');
+                process.exit(0);
+            });
         });
     } catch (error) {
         console.error('Failed to initialize server:', error);

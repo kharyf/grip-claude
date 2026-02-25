@@ -38,7 +38,7 @@ try {
   console.error('Amplify configuration failed:', e.name, e.message);
 }
 
-const API_URL = 'http://192.168.1.227:3000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gr-f1dda9023cb9481db8f60033be624a9b.ecs.us-east-1.on.aws';
 const FALLBACK_STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
 
 
@@ -321,9 +321,17 @@ export default function App() {
 
   useEffect(() => {
     const fetchConfig = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
       try {
-        console.log('Fetching Stripe config from server...');
-        const response = await fetch(`${API_URL}/stripe-config`);
+        console.log(`Fetching Stripe config from server: ${API_URL}/stripe-config`);
+        const response = await fetch(`${API_URL}/stripe-config`, {
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
         if (!response.ok) throw new Error('Network response was not ok');
         const data = await response.json();
         if (data.publishableKey) {
@@ -333,7 +341,13 @@ export default function App() {
           throw new Error('No publishable key in response');
         }
       } catch (error) {
-        console.warn('Failed to fetch Stripe config from server, using fallback:', error.message);
+        clearTimeout(timeoutId);
+        const isTimeout = error.name === 'AbortError';
+        console.warn(
+          isTimeout
+            ? 'Stripe config fetch timed out after 3s, using fallback'
+            : `Failed to fetch Stripe config from server (${error.message || 'unknown error'}), using fallback`
+        );
         setStripePubKey(FALLBACK_STRIPE_PUBLISHABLE_KEY);
       }
     };

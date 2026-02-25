@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
-import { getDefaultCategoryItems } from '../utils/defaults';
+import { getDefaultCategoryItems, BASE_CATEGORIES } from '../utils/defaults';
 
 const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Initialize with base items for all categories
@@ -65,43 +65,13 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     saveData();
   }, [categoryItems, customCategories, isDataLoaded]);
 
-  const baseSpendingData = [
-    {
-      name: 'Groceries',
-      baseAmount: 100,
-      color: '#FF0000',  // Pure Red
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Rent',
-      baseAmount: 100,
-      color: '#00CED1',  // Dark Turquoise
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Entertainment',
-      baseAmount: 100,
-      color: '#FF1493',  // Deep Pink
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Subscriptions',
-      baseAmount: 100,
-      color: '#1E90FF',  // Dodger Blue
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-    {
-      name: 'Savings',
-      baseAmount: 100,
-      color: '#32CD32',  // Lime Green
-      legendFontColor: '#32CD32',
-      legendFontSize: 14,
-    },
-  ];
+  const baseSpendingData = BASE_CATEGORIES.map(cat => ({
+    name: cat.name,
+    baseAmount: 100,
+    color: cat.color,
+    legendFontColor: '#32CD32',
+    legendFontSize: 14,
+  }));
 
   const chartConfig = {
     backgroundColor: '#2a2a2a',
@@ -114,7 +84,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Helper to check if a date falls within the selected time range
   const isWithinTimeRange = (dateString, range) => {
     if (!range || range === 'All Time') return true;
-    if (!dateString || dateString === '-') return false;
+    if (!dateString || dateString === '-') return true; // Treat undated items as "Today"
 
     // Helper to parse "MMM D, YYYY" format reliably
     const parseCustomDate = (str) => {
@@ -185,9 +155,8 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       .map(item => ({
         ...item,
         amount: calculateCategoryTotal(item.name),
-      }))
-      .filter(item => item.amount > 0),
-    // Include custom categories if they have spending in the range
+      })),
+    // Include all custom categories
     ...customCategories
       .map(category => ({
         name: category.name,
@@ -195,30 +164,33 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
         color: category.color,
         legendFontColor: '#32CD32',
         legendFontSize: 14,
-      }))
-      .filter(item => item.amount > 0),
+      })),
   ];
 
-  // Sort spending data in descending order
-  const sortedSpendingData = [...allSpendingData].sort((a, b) => b.amount - a.amount);
+  // Sort spending data in descending order and filter out $0 categories unless in "All Time"
+  const sortedSpendingData = allSpendingData
+    .filter(item => timeRange === 'All Time' || item.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 
   const totalSpending = sortedSpendingData.reduce((sum, item) => sum + item.amount, 0);
 
   // Add percentage to each item for display and truncate names for chart
-  const dataWithPercentage = sortedSpendingData.map(item => {
-    // Truncate long names for the pie chart legend
-    let displayName = item.name;
-    if (displayName.length > 12) {
-      displayName = displayName.substring(0, 12) + '...';
-    }
+  const dataWithPercentage = sortedSpendingData
+    .filter(item => item.amount > 0) // Only show items with data in the chart
+    .map(item => {
+      // Truncate long names for the pie chart legend
+      let displayName = item.name;
+      if (displayName.length > 12) {
+        displayName = displayName.substring(0, 12) + '...';
+      }
 
-    return {
-      ...item,
-      name: displayName,
-      population: item.amount,
-      legendFontSize: 13,
-    };
-  });
+      return {
+        ...item,
+        name: displayName,
+        population: item.amount,
+        legendFontSize: 13,
+      };
+    });
 
   // Get itemized data for a category
   const getItemizedData = (category) => {
@@ -380,7 +352,21 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   };
 
   const handleAddCategory = () => {
-    if (!newCategoryName.trim()) {
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    // Check for duplicates (case-insensitive)
+    const categoryExists = Object.keys(categoryItems).some(
+      key => key.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (categoryExists) {
+      Alert.alert(
+        "Duplicate Category",
+        `A category named "${trimmedName}" already exists. Please choose a unique name.`
+      );
       return;
     }
 
@@ -405,6 +391,34 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
 
     setCustomCategories(prev => [...prev, newCategory]);
     closeAddCategoryModal();
+  };
+
+  const handleDeleteCategory = (categoryName) => {
+    Alert.alert(
+      "Delete Category",
+      `Are you sure you want to delete the "${categoryName}" category? This will permanently delete all spending records associated with it.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            // 1. Remove from categoryItems
+            setCategoryItems(prev => {
+              const updated = { ...prev };
+              delete updated[categoryName];
+              return updated;
+            });
+
+            // 2. Remove from customCategories
+            setCustomCategories(prev => prev.filter(c => c.name !== categoryName));
+
+            // 3. Clear selection and close modal
+            closeModal();
+          }
+        }
+      ]
+    );
   };
 
   const handleRemoveItem = (category, itemId) => {
@@ -579,12 +593,18 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           {chartType === 'Bar' && (
             <BarChart
               data={{
-                labels: sortedSpendingData.slice(0, 8).map(item => {
-                  const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
-                  return name;
-                }),
+                labels: sortedSpendingData
+                  .filter(item => item.amount > 0)
+                  .slice(0, 8)
+                  .map(item => {
+                    const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
+                    return name;
+                  }),
                 datasets: [{
-                  data: sortedSpendingData.slice(0, 8).map(item => item.amount)
+                  data: sortedSpendingData
+                    .filter(item => item.amount > 0)
+                    .slice(0, 8)
+                    .map(item => item.amount)
                 }]
               }}
               width={Dimensions.get('window').width - 40}
@@ -604,12 +624,18 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           {chartType === 'Line' && (
             <LineChart
               data={{
-                labels: sortedSpendingData.slice(0, 8).map(item => {
-                  const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
-                  return name;
-                }),
+                labels: sortedSpendingData
+                  .filter(item => item.amount > 0)
+                  .slice(0, 8)
+                  .map(item => {
+                    const name = item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name;
+                    return name;
+                  }),
                 datasets: [{
-                  data: sortedSpendingData.slice(0, 8).map(item => item.amount)
+                  data: sortedSpendingData
+                    .filter(item => item.amount > 0)
+                    .slice(0, 8)
+                    .map(item => item.amount)
                 }]
               }}
               width={Dimensions.get('window').width - 40}
@@ -652,7 +678,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                 <Text style={styles.legendText} numberOfLines={1} ellipsizeMode="tail">
                   {item.name}
                 </Text>
-                <Text style={styles.amountText}>{currencySymbol}{item.amount}</Text>
+                <Text style={styles.amountText}>{currencySymbol}{Math.round(item.amount)}</Text>
                 <Text style={styles.arrowText}>›</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -719,9 +745,17 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total</Text>
                   <Text style={styles.totalAmount}>
-                    {currencySymbol}{selectedCategory && (sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
+                    {currencySymbol}{selectedCategory && Math.round(sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
                   </Text>
                 </View>
+
+                {/* Delete Category Button */}
+                <TouchableOpacity
+                  style={styles.deleteCategoryModalButton}
+                  onPress={() => handleDeleteCategory(selectedCategory)}
+                >
+                  <Text style={styles.deleteCategoryModalButtonText}>🗑️ Delete Entire Category</Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
           </View>
@@ -1232,6 +1266,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
     letterSpacing: 1,
+  },
+  deleteCategoryModalButton: {
+    backgroundColor: '#FF0000',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 20,
+    marginBottom: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  deleteCategoryModalButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });
 

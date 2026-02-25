@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { Picker } from '@react-native-picker/picker';
 import { useSubscription } from '../context/SubscriptionContext';
 import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { parseReceiptText } from '../utils/receiptParser';
+import { BASE_CATEGORIES } from '../utils/defaults';
 
 const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
   requestNonPersonalizedAdsOnly: true,
@@ -24,6 +26,17 @@ const ChatTab = ({ currencySymbol = '$' }) => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [adLoaded, setAdLoaded] = useState(false);
   const pendingScanRef = useRef(false);
+
+  // Confirmation Modal State
+  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [editMerchant, setEditMerchant] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [activeProcessingId, setActiveProcessingId] = useState(null);
+  const [activeImageUri, setActiveImageUri] = useState(null);
+  const [allCategories, setAllCategories] = useState(BASE_CATEGORIES.map(c => c.name));
+  const [isCategoryPickerVisible, setIsCategoryPickerVisible] = useState(false);
 
   // Interstitial ad lifecycle
   useEffect(() => {
@@ -60,26 +73,34 @@ const ChatTab = ({ currencySymbol = '$' }) => {
     };
   }, []);
 
-  // Load scanner history on mount
+  // Load scanner history and categories on mount
   useEffect(() => {
-    const loadMessages = async () => {
+    const loadData = async () => {
       try {
+        // 1. Load Messages
         const savedMessages = await AsyncStorage.getItem('scanner_messages');
         if (savedMessages !== null) {
-          // Parse and convert strings back to Date objects for timestamps
           const parsed = JSON.parse(savedMessages).map(m => ({
             ...m,
             timestamp: new Date(m.timestamp)
           }));
           setMessages(parsed);
         }
+
+        // 2. Load Categories
+        const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+        if (savedCustomCategories !== null) {
+          const custom = JSON.parse(savedCustomCategories);
+          const baseCategories = BASE_CATEGORIES.map(c => c.name);
+          setAllCategories([...baseCategories, ...custom.map(c => c.name)]);
+        }
       } catch (error) {
-        console.error('Failed to load scanner history:', error);
+        console.error('Failed to load initial data:', error);
       } finally {
         setIsDataLoaded(true);
       }
     };
-    loadMessages();
+    loadData();
   }, []);
 
   // Save scanner history whenever messages change
@@ -226,98 +247,21 @@ const ChatTab = ({ currencySymbol = '$' }) => {
       console.log('OCR Result:', resultText);
       const receiptData = parseReceiptText(resultText);
 
-      // Show confirmation alert before adding to database
-      Alert.alert(
-        "Confirm Receipt Scan",
-        `Merchant: ${receiptData.merchant}\nAmount: ${currencySymbol}${receiptData.amount}\nDate: ${receiptData.date}\nCategory: ${receiptData.category}`,
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => {
-              setMessages(prev => [
-                ...prev.filter(m => m.id !== processingId),
-                {
-                  id: Date.now(),
-                  text: "Scan canceled. You can try scanning again if the data was incorrect.",
-                  isUser: false,
-                  timestamp: new Date(),
-                }
-              ]);
-            }
-          },
-          {
-            text: "Retake",
-            onPress: () => {
-              setMessages(prev => prev.filter(m => m.id !== processingId));
-              handleCameraPress(); // Call the main camera trigger again
-            }
-          },
-          {
-            text: "Add to Spending",
-            onPress: async () => {
-              try {
-                // 1. Get existing spending data and categories
-                const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
-                const savedCustomCategories = await AsyncStorage.getItem('customCategories');
-                let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
-                const customCategories = savedCustomCategories ? JSON.parse(savedCustomCategories) : [];
+      setEditMerchant(receiptData.merchant);
+      setEditAmount(receiptData.amount.toString());
+      setEditDate(receiptData.date);
 
-                // 2. Prepare valid categories list
-                const baseCategories = ['Groceries', 'Rent', 'Utilities', 'Transportation', 'Entertainment', 'Dining Out', 'Healthcare', 'Vacation', 'Subscriptions', 'Savings'];
-                const allCategories = [...baseCategories, ...customCategories];
+      // Validate suggested category
+      let suggestedCategory = receiptData.category;
+      if (!allCategories.includes(suggestedCategory)) {
+        suggestedCategory = 'Groceries';
+      }
+      setEditCategory(suggestedCategory);
 
-                // 3. Validate category
-                let category = receiptData.category;
-                if (!allCategories.includes(category)) {
-                  console.log(`Scanner found non-existent category "${category}", falling back to Groceries.`);
-                  category = 'Groceries';
-                }
+      setActiveProcessingId(processingId);
+      setActiveImageUri(imageUri);
+      setConfirmationModalVisible(true);
 
-                // 4. Prepare the new item
-                const newItem = {
-                  id: Date.now(),
-                  name: receiptData.merchant,
-                  date: receiptData.date,
-                  amount: parseFloat(receiptData.amount),
-                  isBase: false,
-                };
-
-                // 5. Add to the correct category
-                categoryItems[category] = [...(categoryItems[category] || []), newItem];
-
-                // 4. Save back to AsyncStorage
-                await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
-
-                // 5. Add confirmation message to chat
-                const confirmationMessage = {
-                  id: Date.now() + 1,
-                  text: `I've confirmed the receipt from ${receiptData.merchant} for ${currencySymbol}${receiptData.amount}. Adding it now to ${receiptData.category}.`,
-                  isUser: false,
-                  timestamp: new Date(),
-                };
-
-                setMessages(prev => [...prev.filter(m => m.id !== processingId), confirmationMessage]);
-
-                // 6. Add success message
-                setTimeout(() => {
-                  const successMessage = {
-                    id: Date.now() + 2,
-                    text: `✅ Added ${currencySymbol}${receiptData.amount} to ${receiptData.category} for ${receiptData.merchant}. You can view it in the Spending tab!`,
-                    isUser: false,
-                    timestamp: new Date(),
-                  };
-                  setMessages(prev => [...prev, successMessage]);
-                }, 1000);
-              } catch (saveError) {
-                console.error('Failed to save to spending data:', saveError);
-                Alert.alert('Error', 'Failed to save to spending database.');
-              }
-            }
-          }
-        ],
-        { cancelable: false }
-      );
     } catch (error) {
       console.error('Error processing receipt:', error);
       setMessages(prev => [
@@ -359,6 +303,83 @@ const ChatTab = ({ currencySymbol = '$' }) => {
         }
       ]
     );
+  };
+
+  const handleConfirmReceipt = async () => {
+    try {
+      const amount = parseFloat(editAmount);
+      if (isNaN(amount) || amount <= 0) {
+        Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+        return;
+      }
+
+      // 1. Get existing data
+      const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
+      const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+      let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
+      const customCategories = savedCustomCategories ? JSON.parse(savedCustomCategories) : [];
+
+      // 2. Prepare categories (using state)
+      const category = editCategory;
+
+      // 4. Create item
+      const newItem = {
+        id: Date.now(),
+        name: editMerchant,
+        date: editDate,
+        amount: amount,
+        isBase: false,
+      };
+
+      // 5. Save
+      categoryItems[category] = [...(categoryItems[category] || []), newItem];
+      await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
+
+      // 6. Update chat
+      const confirmationMessage = {
+        id: Date.now() + 1,
+        text: `I've confirmed the receipt from ${editMerchant} for ${currencySymbol}${amount}. Adding it now to ${category}.`,
+        isUser: false,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev.filter(m => m.id !== activeProcessingId), confirmationMessage]);
+
+      setTimeout(() => {
+        const successMessage = {
+          id: Date.now() + 2,
+          text: `✅ Added ${currencySymbol}${amount} to ${category} for ${editMerchant}. You can view it in the Spending tab!`,
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, successMessage]);
+      }, 1000);
+
+      // 7. Reset
+      setConfirmationModalVisible(false);
+    } catch (error) {
+      console.error('Failed to confirm receipt:', error);
+      Alert.alert('Error', 'Failed to save to spending database.');
+    }
+  };
+
+  const handleRetakeReceipt = () => {
+    setConfirmationModalVisible(false);
+    setMessages(prev => prev.filter(m => m.id !== activeProcessingId));
+    handleCameraPress();
+  };
+
+  const handleCancelReceipt = () => {
+    setConfirmationModalVisible(false);
+    setMessages(prev => [
+      ...prev.filter(m => m.id !== activeProcessingId),
+      {
+        id: Date.now(),
+        text: "Scan canceled. You can try scanning again if the data was incorrect.",
+        isUser: false,
+        timestamp: new Date(),
+      }
+    ]);
   };
 
   return (
@@ -403,6 +424,117 @@ const ChatTab = ({ currencySymbol = '$' }) => {
             <Text style={styles.clearButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Receipt Confirmation Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={confirmationModalVisible}
+          onRequestClose={handleCancelReceipt}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Confirm Receipt Scan</Text>
+                <TouchableOpacity onPress={handleCancelReceipt} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.addItemForm}>
+                {activeImageUri && (
+                  <View style={styles.scannedImageContainer}>
+                    <Image source={{ uri: activeImageUri }} style={styles.scannedImage} />
+                  </View>
+                )}
+
+                <Text style={styles.inputLabel}>Category *</Text>
+                <TouchableOpacity
+                  style={styles.pickerContainer}
+                  onPress={() => setIsCategoryPickerVisible(true)}
+                >
+                  <Text style={styles.pickerText}>{editCategory}</Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.inputLabel}>Merchant / Item Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editMerchant}
+                  onChangeText={setEditMerchant}
+                  placeholder="e.g., Whole Foods"
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={styles.inputLabel}>Date</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editDate}
+                  onChangeText={setEditDate}
+                  placeholder="e.g., Dec 25, 2024"
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={styles.inputLabel}>Amount *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editAmount}
+                  onChangeText={setEditAmount}
+                  placeholder="e.g., 45.50"
+                  placeholderTextColor="#666"
+                  keyboardType="decimal-pad"
+                />
+
+                <TouchableOpacity style={styles.submitButton} onPress={handleConfirmReceipt}>
+                  <Text style={styles.submitButtonText}>Add to Spending</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.retakeButton} onPress={handleRetakeReceipt}>
+                  <Text style={styles.retakeButtonText}>📸 Retake Photo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.cancelButton} onPress={handleCancelReceipt}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Internal Category Dropdown Overlay */}
+              {isCategoryPickerVisible && (
+                <View style={styles.pickerOverlayContainer}>
+                  <View style={styles.pickerModalHeader}>
+                    <Text style={styles.pickerModalTitle}>Select Category</Text>
+                    <TouchableOpacity onPress={() => setIsCategoryPickerVisible(false)} style={styles.closePickerButton}>
+                      <Text style={styles.closePickerButtonText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView style={styles.pickerScrollView}>
+                    {allCategories.map((cat, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.pickerItem,
+                          editCategory === cat && styles.pickerItemSelected
+                        ]}
+                        onPress={() => {
+                          setEditCategory(cat);
+                          setIsCategoryPickerVisible(false);
+                        }}
+                      >
+                        <Text style={[
+                          styles.pickerItemText,
+                          editCategory === cat && styles.pickerItemTextSelected
+                        ]}>
+                          {cat}
+                        </Text>
+                        {editCategory === cat && <Text style={styles.checkIcon}>✓</Text>}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </View>
   );
@@ -499,6 +631,210 @@ const styles = StyleSheet.create({
   },
   clearButtonText: {
     fontSize: 28,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#32CD32',
+    width: '90%',
+    maxHeight: '85%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#32CD32',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#32CD32',
+    flex: 1,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#32CD32',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: '#1a1a1a',
+    fontWeight: 'bold',
+  },
+  addItemForm: {
+    padding: 20,
+  },
+  scannedImageContainer: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#32CD32',
+  },
+  scannedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#32CD32',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#32CD32',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#32CD32',
+    fontSize: 16,
+  },
+  pickerContainer: {
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#32CD32',
+    borderRadius: 8,
+    marginTop: 4,
+    height: 50,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pickerText: {
+    color: '#32CD32',
+    fontSize: 16,
+  },
+  dropdownArrow: {
+    color: '#32CD32',
+    fontSize: 12,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerModalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#32CD32',
+    width: '80%',
+    maxHeight: '60%',
+    overflow: 'hidden',
+  },
+  pickerModalHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#32CD32',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pickerModalTitle: {
+    color: '#32CD32',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closePickerButton: {
+    padding: 4,
+  },
+  closePickerButtonText: {
+    color: '#32CD32',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  pickerScrollView: {
+    flex: 1,
+  },
+  pickerOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1a1a1a',
+    zIndex: 10,
+    borderRadius: 16,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(50, 205, 50, 0.1)',
+  },
+  pickerItemSelected: {
+    backgroundColor: 'rgba(50, 205, 50, 0.1)',
+  },
+  pickerItemText: {
+    color: '#32CD32',
+    fontSize: 16,
+  },
+  pickerItemTextSelected: {
+    fontWeight: 'bold',
+  },
+  checkIcon: {
+    color: '#32CD32',
+    fontSize: 18,
+  },
+  submitButton: {
+    backgroundColor: '#32CD32',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  retakeButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#32CD32',
+  },
+  retakeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#32CD32',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 

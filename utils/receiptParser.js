@@ -58,12 +58,12 @@ export const parseReceiptText = (text) => {
     const categoryMap = {
         'Whole Foods': 'Groceries',
         'Target': 'Groceries',
-        'Starbucks': 'Dining Out',
-        'Shell': 'Transportation',
+        'Starbucks': 'Entertainment',
+        'Shell': 'Rent', // Just a fallback, not ideal but staying within 5
         'Amazon': 'Groceries',
         'Walmart': 'Groceries',
-        'Uber': 'Transportation',
-        'McDonald': 'Dining Out'
+        'Uber': 'Rent', // Fallback
+        'McDonald': 'Entertainment'
     };
 
     let category = 'Groceries'; // Default
