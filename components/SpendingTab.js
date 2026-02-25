@@ -3,30 +3,10 @@ import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
+import { getDefaultCategoryItems } from '../utils/defaults';
 
 const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Initialize with base items for all categories
-  const getInitialCategoryItems = () => {
-    const currentYear = new Date().getFullYear();
-    return {
-      'Groceries': [
-        { id: 'base-1', name: 'Groceries - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Rent': [
-        { id: 'base-2', name: 'Rent - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Entertainment': [
-        { id: 'base-5', name: 'Entertainment - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Subscriptions': [
-        { id: 'base-9', name: 'Subscriptions - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-      'Savings': [
-        { id: 'base-10', name: 'Savings - Example', date: `Dec 20, ${currentYear}`, amount: 100, isBase: true },
-      ],
-    };
-  };
-
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [addItemModalVisible, setAddItemModalVisible] = useState(false);
@@ -35,7 +15,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   const [newItemDate, setNewItemDate] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [categoryItems, setCategoryItems] = useState(getInitialCategoryItems());
+  const [categoryItems, setCategoryItems] = useState(getDefaultCategoryItems());
   const [customCategories, setCustomCategories] = useState([]);
   const [editItemModalVisible, setEditItemModalVisible] = useState(false);
   const [itemToEdit, setItemToEdit] = useState(null);
@@ -136,16 +116,33 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     if (!range || range === 'All Time') return true;
     if (!dateString || dateString === '-') return false;
 
-    // The stored format is "MMM D, YYYY" (e.g., "Dec 20, 2026")
-    // Javascript's Date constructor can parse this format
-    const itemDate = new Date(dateString);
-    if (isNaN(itemDate.getTime())) return true; // Fallback if parsing fails
+    // Helper to parse "MMM D, YYYY" format reliably
+    const parseCustomDate = (str) => {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) return d;
+
+      // Fallback for tricky environments: manual parse "Feb 24, 2026"
+      const match = str.match(/([A-Z][a-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+      if (match) {
+        const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+        const month = months[match[1].substring(0, 3)];
+        const day = parseInt(match[2]);
+        const year = parseInt(match[3]);
+        if (month !== undefined) return new Date(year, month, day);
+      }
+      return null;
+    };
+
+    const itemDate = parseCustomDate(dateString);
+    if (!itemDate) return true; // Fallback to showing if we can't parse
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(startOfToday);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     if (range === 'Today') {
-      return itemDate >= startOfToday;
+      return itemDate >= startOfToday && itemDate < tomorrow;
     }
 
     if (range === 'This Week') {
@@ -153,17 +150,17 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as start of week
       const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diff);
       startOfWeek.setHours(0, 0, 0, 0);
-      return itemDate >= startOfWeek;
+      return itemDate >= startOfWeek && itemDate < tomorrow;
     }
 
     if (range === 'This Month') {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return itemDate >= startOfMonth;
+      return itemDate >= startOfMonth && itemDate < tomorrow;
     }
 
     if (range === 'This Year') {
       const startOfYear = new Date(now.getFullYear(), 0, 1);
-      return itemDate >= startOfYear;
+      return itemDate >= startOfYear && itemDate < tomorrow;
     }
 
     return true;
@@ -517,7 +514,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>Total:</Text>
+            <Text style={styles.totalLabel}>Total Money Spent:</Text>
             <Text style={styles.totalAmountText}>{currencySymbol}{totalSpending.toLocaleString()}</Text>
           </View>
           <TouchableOpacity

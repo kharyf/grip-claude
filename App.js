@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
@@ -216,7 +216,11 @@ function AppContent() {
             <Text style={styles.userIconText}>{userInitial}</Text>
           </View>
         </TouchableOpacity>
-        <Text style={styles.appTitle}>Gripah</Text>
+        <Image
+          source={require('./assets/GripahLogo.png')}
+          style={styles.appLogo}
+          resizeMode="contain"
+        />
         <View style={styles.userIconPlaceholder} />
       </View>
 
@@ -394,11 +398,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#32CD32',
-    letterSpacing: 2,
+  appLogo: {
+    height: 40,
+    width: 160,
   },
   tabContainer: {
     flexDirection: 'row',

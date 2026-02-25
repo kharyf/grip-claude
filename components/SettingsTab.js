@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, Modal, Al
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { Slider } from '@miblanchard/react-native-slider';
+import { getDefaultCategoryItems } from '../utils/defaults';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import SubscriptionScreen from './SubscriptionScreen';
@@ -21,7 +22,9 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
 
   const handleResetDatabase = async () => {
     try {
-      await AsyncStorage.multiRemove(['categoryItems', 'customCategories']);
+      const defaultItems = getDefaultCategoryItems();
+      await AsyncStorage.setItem('categoryItems', JSON.stringify(defaultItems));
+      await AsyncStorage.setItem('customCategories', JSON.stringify([]));
       setResetModalVisible(false);
       Alert.alert('Success', 'Database has been reset. Please restart the app or navigate back to Spending tab to see changes.');
     } catch (error) {
