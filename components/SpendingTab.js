@@ -4,8 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import { getDefaultCategoryItems, BASE_CATEGORIES } from '../utils/defaults';
+import { useTheme } from '../context/ThemeContext';
 
 const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
+  const { theme } = useTheme();
   // Initialize with base items for all categories
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -69,22 +71,36 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     name: cat.name,
     baseAmount: 100,
     color: cat.color,
-    legendFontColor: '#32CD32',
+    legendFontColor: theme.trim,
     legendFontSize: 14,
   }));
 
+  // Parse trim color to rgb components for chartConfig
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+      : { r: 50, g: 205, b: 50 };
+  };
+  const trimRgb = hexToRgb(theme.trim);
+  const secRgb = hexToRgb(theme.secondary);
+
   const chartConfig = {
-    backgroundColor: '#2a2a2a',
-    backgroundGradientFrom: '#2a2a2a',
-    backgroundGradientTo: '#2a2a2a',
-    color: (opacity = 1) => `rgba(50, 205, 50, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(50, 205, 50, ${opacity})`,
+    backgroundColor: theme.secondary,
+    backgroundGradientFrom: theme.secondary,
+    backgroundGradientTo: theme.secondary,
+    color: (opacity = 1) => `rgba(${trimRgb.r}, ${trimRgb.g}, ${trimRgb.b}, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(${trimRgb.r}, ${trimRgb.g}, ${trimRgb.b}, ${opacity})`,
   };
 
   // Helper to check if a date falls within the selected time range
   const isWithinTimeRange = (dateString, range) => {
     if (!range || range === 'All Time') return true;
-    if (!dateString || dateString === '-') return true; // Treat undated items as "Today"
+
+    // Treat undated items as "Today", so they show in all active ranges (Today, Week, Month, Year)
+    if (!dateString || dateString === '-') {
+      return range !== 'All Time'; // Showing in all filtered ranges
+    }
 
     // Helper to parse "MMM D, YYYY" format reliably
     const parseCustomDate = (str) => {
@@ -104,7 +120,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     };
 
     const itemDate = parseCustomDate(dateString);
-    if (!itemDate) return true; // Fallback to showing if we can't parse
+    if (!itemDate) return false; // If we can't parse it, don't show it in specific time ranges
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -523,20 +539,20 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   };
 
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.backgroundPattern} />
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
+    <View style={[styles.wrapper, { backgroundColor: theme.main }]}>
+      <View style={[styles.backgroundPattern, { backgroundColor: theme.main }]} />
+      <ScrollView style={[styles.container, { backgroundColor: `${theme.secondary}D9` }]}>
+        <View style={[styles.header, { borderBottomColor: theme.trim }]}>
           <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>Total Money Spent:</Text>
-            <Text style={styles.totalAmountText}>{currencySymbol}{totalSpending.toLocaleString()}</Text>
+            <Text style={[styles.totalLabel, { color: theme.trim }]}>Total Money Spent:</Text>
+            <Text style={[styles.totalAmountText, { color: theme.trim }]}>{currencySymbol}{totalSpending.toLocaleString()}</Text>
           </View>
           <TouchableOpacity
-            style={styles.filterContainer}
+            style={[styles.filterContainer, { backgroundColor: theme.main, borderColor: theme.trim }]}
             onPress={() => setTimeRangeModalVisible(true)}
           >
-            <Text style={styles.timeRangeText}>{timeRange}</Text>
-            <Text style={styles.dropdownArrow}>▼</Text>
+            <Text style={[styles.timeRangeText, { color: theme.trim }]}>{timeRange}</Text>
+            <Text style={[styles.dropdownArrow, { color: theme.trim }]}>▼</Text>
           </TouchableOpacity>
 
           <Modal
@@ -550,13 +566,13 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
               activeOpacity={1}
               onPress={() => setTimeRangeModalVisible(false)}
             >
-              <View style={styles.timeRangeMenu}>
+              <View style={[styles.timeRangeMenu, { backgroundColor: theme.main, borderColor: theme.trim }]}>
                 {['Today', 'This Week', 'This Month', 'This Year', 'All Time'].map((range) => (
                   <TouchableOpacity
                     key={range}
                     style={[
                       styles.timeRangeOption,
-                      timeRange === range && styles.timeRangeOptionSelected
+                      timeRange === range && { backgroundColor: `${theme.trim}26` }
                     ]}
                     onPress={() => {
                       setTimeRange(range);
@@ -565,11 +581,11 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   >
                     <Text style={[
                       styles.timeRangeOptionText,
-                      timeRange === range && styles.timeRangeOptionTextSelected
+                      timeRange === range && { color: theme.trim, fontWeight: '700' }
                     ]}>
                       {range}
                     </Text>
-                    {timeRange === range && <Text style={styles.checkIcon}>✓</Text>}
+                    {timeRange === range && <Text style={[styles.checkIcon, { color: theme.trim }]}>✓</Text>}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -670,22 +686,22 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           {sortedSpendingData.map((item, index) => (
             <View key={index} style={styles.legendItemContainer}>
               <TouchableOpacity
-                style={styles.legendItem}
+                style={[styles.legendItem, { borderColor: theme.trim, backgroundColor: theme.main }]}
                 onPress={() => handleCategoryPress(item.name)}
                 activeOpacity={0.7}
               >
                 <View style={[styles.colorBox, { backgroundColor: item.color }]} />
-                <Text style={styles.legendText} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={[styles.legendText, { color: theme.trim }]} numberOfLines={1} ellipsizeMode="tail">
                   {item.name}
                 </Text>
-                <Text style={styles.amountText}>{currencySymbol}{Math.round(item.amount)}</Text>
-                <Text style={styles.arrowText}>›</Text>
+                <Text style={[styles.amountText, { color: theme.trim }]}>{currencySymbol}{Math.round(item.amount)}</Text>
+                <Text style={[styles.arrowText, { color: theme.trim }]}>›</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.addButton}
+                style={[styles.addButton, { backgroundColor: theme.trim, borderColor: theme.main }]}
                 onPress={() => openAddItemModal(item.name)}
               >
-                <Text style={styles.addButtonText}>+</Text>
+                <Text style={[styles.addButtonText, { color: theme.main }]}>+</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -694,10 +710,10 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
         {/* Add Category Button */}
         <View style={styles.addCategoryButtonContainer}>
           <TouchableOpacity
-            style={styles.addCategoryButton}
+            style={[styles.addCategoryButton, { backgroundColor: theme.trim, borderColor: theme.main, shadowColor: theme.trim }]}
             onPress={openAddCategoryModal}
           >
-            <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
+            <Text style={[styles.addCategoryButtonText, { color: theme.main }]}>+ Add Category</Text>
           </TouchableOpacity>
         </View>
 
@@ -709,29 +725,29 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           onRequestClose={closeModal}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
+            <View style={[styles.modalContent, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.trim }]}>
+                <Text style={[styles.modalTitle, { color: theme.trim }]}>
                   {selectedCategory} - Itemized Breakdown
                 </Text>
-                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+                <TouchableOpacity onPress={closeModal} style={[styles.closeButton, { backgroundColor: theme.trim }]}>
+                  <Text style={[styles.closeButtonText, { color: theme.main }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalBody}>
                 {selectedCategory && getItemizedData(selectedCategory).map((item, index) => (
-                  <View key={index} style={styles.itemRow}>
+                  <View key={index} style={[styles.itemRow, { backgroundColor: theme.secondary, borderColor: theme.trim }]}>
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemDate}>{item.date}</Text>
+                      <Text style={[styles.itemName, { color: theme.trim }]}>{item.name}</Text>
+                      <Text style={[styles.itemDate, { color: theme.trim }]}>{item.date}</Text>
                     </View>
-                    <Text style={styles.itemAmount}>{currencySymbol}{item.amount}</Text>
+                    <Text style={[styles.itemAmount, { color: theme.trim }]}>{currencySymbol}{item.amount}</Text>
                     <TouchableOpacity
                       style={styles.editButton}
                       onPress={() => openEditItemModal(selectedCategory, item)}
                     >
-                      <Text style={styles.editButtonText}>✎</Text>
+                      <Text style={[styles.editButtonText, { color: theme.main }]}>✎</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.removeButton}
@@ -742,9 +758,9 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   </View>
                 ))}
 
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalAmount}>
+                <View style={[styles.totalRow, { borderTopColor: theme.trim }]}>
+                  <Text style={[styles.totalLabel, { color: theme.trim }]}>Total</Text>
+                  <Text style={[styles.totalAmount, { color: theme.trim }]}>
                     {currencySymbol}{selectedCategory && Math.round(sortedSpendingData.find(d => d.name === selectedCategory)?.amount || 0)}
                   </Text>
                 </View>
@@ -769,36 +785,36 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           onRequestClose={closeAddItemModal}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.addItemModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add Item to {selectedCategory}</Text>
-                <TouchableOpacity onPress={closeAddItemModal} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+            <View style={[styles.addItemModalContent, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.trim }]}>
+                <Text style={[styles.modalTitle, { color: theme.trim }]}>Add Item to {selectedCategory}</Text>
+                <TouchableOpacity onPress={closeAddItemModal} style={[styles.closeButton, { backgroundColor: theme.trim }]}>
+                  <Text style={[styles.closeButtonText, { color: theme.main }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.addItemForm}>
-                <Text style={styles.inputLabel}>Item Name *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Item Name *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={newItemName}
                   onChangeText={setNewItemName}
                   placeholder="e.g., Whole Foods"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Date (optional)</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Date (optional)</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={newItemDate}
                   onChangeText={setNewItemDate}
                   placeholder="e.g., Dec 25, 2024 or 12/25/2024"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Amount *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Amount *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={newItemAmount}
                   onChangeText={setNewItemAmount}
                   placeholder="e.g., 45.50"
@@ -806,8 +822,8 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   keyboardType="decimal-pad"
                 />
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleAddItem}>
-                  <Text style={styles.submitButtonText}>Add Item</Text>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: theme.trim }]} onPress={handleAddItem}>
+                  <Text style={[styles.submitButtonText, { color: theme.main }]}>Add Item</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -822,26 +838,26 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           onRequestClose={closeAddCategoryModal}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.addItemModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add New Category</Text>
-                <TouchableOpacity onPress={closeAddCategoryModal} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+            <View style={[styles.addItemModalContent, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.trim }]}>
+                <Text style={[styles.modalTitle, { color: theme.trim }]}>Add New Category</Text>
+                <TouchableOpacity onPress={closeAddCategoryModal} style={[styles.closeButton, { backgroundColor: theme.trim }]}>
+                  <Text style={[styles.closeButtonText, { color: theme.main }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.addItemForm}>
-                <Text style={styles.inputLabel}>Category Name *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Category Name *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={newCategoryName}
                   onChangeText={setNewCategoryName}
                   placeholder="e.g., Travel, Hobbies, Gifts"
                   placeholderTextColor="#666"
                 />
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleAddCategory}>
-                  <Text style={styles.submitButtonText}>Add Category</Text>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: theme.trim }]} onPress={handleAddCategory}>
+                  <Text style={[styles.submitButtonText, { color: theme.main }]}>Add Category</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -856,36 +872,36 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
           onRequestClose={closeEditItemModal}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.addItemModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Item</Text>
-                <TouchableOpacity onPress={closeEditItemModal} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+            <View style={[styles.addItemModalContent, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.trim }]}>
+                <Text style={[styles.modalTitle, { color: theme.trim }]}>Edit Item</Text>
+                <TouchableOpacity onPress={closeEditItemModal} style={[styles.closeButton, { backgroundColor: theme.trim }]}>
+                  <Text style={[styles.closeButtonText, { color: theme.main }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.addItemForm}>
-                <Text style={styles.inputLabel}>Item Name *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Item Name *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editItemName}
                   onChangeText={setEditItemName}
                   placeholder="e.g., Whole Foods"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Date</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Date</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editItemDate}
                   onChangeText={setEditItemDate}
                   placeholder="e.g., Dec 25, 2024 or 12/25/2024"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Amount *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Amount *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editItemAmount}
                   onChangeText={setEditItemAmount}
                   placeholder="e.g., 45.50"
@@ -893,8 +909,8 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   keyboardType="decimal-pad"
                 />
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleEditItem}>
-                  <Text style={styles.submitButtonText}>Save Changes</Text>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: theme.trim }]} onPress={handleEditItem}>
+                  <Text style={[styles.submitButtonText, { color: theme.main }]}>Save Changes</Text>
                 </TouchableOpacity>
               </View>
             </View>

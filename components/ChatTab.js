@@ -3,9 +3,10 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Keyboa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import mobileAds, { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { Picker } from '@react-native-picker/picker';
 import { useSubscription } from '../context/SubscriptionContext';
-import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
+import { useTheme } from '../context/ThemeContext';
 import { parseReceiptText } from '../utils/receiptParser';
 import { BASE_CATEGORIES } from '../utils/defaults';
 
@@ -14,6 +15,7 @@ const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
 });
 
 const ChatTab = ({ currencySymbol = '$' }) => {
+  const { theme } = useTheme();
   const { status } = useSubscription();
   const [messages, setMessages] = useState([
     {
@@ -383,10 +385,10 @@ const ChatTab = ({ currencySymbol = '$' }) => {
   };
 
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.backgroundPattern} />
+    <View style={[styles.wrapper, { backgroundColor: theme.main }]}>
+      <View style={[styles.backgroundPattern, { backgroundColor: theme.main }]} />
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: `${theme.secondary}D9` }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={100}
       >
@@ -399,20 +401,23 @@ const ChatTab = ({ currencySymbol = '$' }) => {
               key={message.id}
               style={[
                 styles.messageBubble,
-                message.isUser ? styles.userMessage : styles.aiMessage,
+                { borderColor: theme.trim },
+                message.isUser
+                  ? { alignSelf: 'flex-end', backgroundColor: `${theme.trim}22` }
+                  : { alignSelf: 'flex-start', backgroundColor: theme.main },
               ]}
             >
-              <Text style={styles.messageText}>{message.text}</Text>
-              <Text style={styles.timestamp}>
+              <Text style={[styles.messageText, { color: theme.trim }]}>{message.text}</Text>
+              <Text style={[styles.timestamp, { color: theme.trim }]}>
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
           ))}
         </ScrollView>
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { borderTopColor: theme.trim, backgroundColor: theme.main }]}>
           <TouchableOpacity
-            style={styles.cameraButton}
+            style={[styles.cameraButton, { backgroundColor: theme.trim }]}
             onPress={handleCameraPress}
           >
             <Text style={styles.cameraButtonText}>📷</Text>
@@ -433,51 +438,51 @@ const ChatTab = ({ currencySymbol = '$' }) => {
           onRequestClose={handleCancelReceipt}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Confirm Receipt Scan</Text>
-                <TouchableOpacity onPress={handleCancelReceipt} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+            <View style={[styles.modalContent, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.trim }]}>
+                <Text style={[styles.modalTitle, { color: theme.trim }]}>Confirm Receipt Scan</Text>
+                <TouchableOpacity onPress={handleCancelReceipt} style={[styles.closeButton, { backgroundColor: theme.trim }]}>
+                  <Text style={[styles.closeButtonText, { color: theme.main }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.addItemForm}>
                 {activeImageUri && (
-                  <View style={styles.scannedImageContainer}>
+                  <View style={[styles.scannedImageContainer, { borderColor: theme.trim }]}>
                     <Image source={{ uri: activeImageUri }} style={styles.scannedImage} />
                   </View>
                 )}
 
-                <Text style={styles.inputLabel}>Category *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Category *</Text>
                 <TouchableOpacity
-                  style={styles.pickerContainer}
+                  style={[styles.pickerContainer, { backgroundColor: theme.secondary, borderColor: theme.trim }]}
                   onPress={() => setIsCategoryPickerVisible(true)}
                 >
-                  <Text style={styles.pickerText}>{editCategory}</Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
+                  <Text style={[styles.pickerText, { color: theme.trim }]}>{editCategory}</Text>
+                  <Text style={[styles.dropdownArrow, { color: theme.trim }]}>▼</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.inputLabel}>Merchant / Item Name *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Merchant / Item Name *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editMerchant}
                   onChangeText={setEditMerchant}
                   placeholder="e.g., Whole Foods"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Date</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Date</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editDate}
                   onChangeText={setEditDate}
                   placeholder="e.g., Dec 25, 2024"
                   placeholderTextColor="#666"
                 />
 
-                <Text style={styles.inputLabel}>Amount *</Text>
+                <Text style={[styles.inputLabel, { color: theme.trim }]}>Amount *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editAmount}
                   onChangeText={setEditAmount}
                   placeholder="e.g., 45.50"
@@ -485,12 +490,12 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                   keyboardType="decimal-pad"
                 />
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleConfirmReceipt}>
-                  <Text style={styles.submitButtonText}>Add to Spending</Text>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: theme.trim }]} onPress={handleConfirmReceipt}>
+                  <Text style={[styles.submitButtonText, { color: theme.main }]}>Add to Spending</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.retakeButton} onPress={handleRetakeReceipt}>
-                  <Text style={styles.retakeButtonText}>📸 Retake Photo</Text>
+                <TouchableOpacity style={[styles.retakeButton, { borderColor: theme.trim }]} onPress={handleRetakeReceipt}>
+                  <Text style={[styles.retakeButtonText, { color: theme.trim }]}>📸 Retake Photo</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.cancelButton} onPress={handleCancelReceipt}>
@@ -500,11 +505,11 @@ const ChatTab = ({ currencySymbol = '$' }) => {
 
               {/* Internal Category Dropdown Overlay */}
               {isCategoryPickerVisible && (
-                <View style={styles.pickerOverlayContainer}>
-                  <View style={styles.pickerModalHeader}>
-                    <Text style={styles.pickerModalTitle}>Select Category</Text>
+                <View style={[styles.pickerOverlayContainer, { backgroundColor: theme.main }]}>
+                  <View style={[styles.pickerModalHeader, { borderBottomColor: theme.trim }]}>
+                    <Text style={[styles.pickerModalTitle, { color: theme.trim }]}>Select Category</Text>
                     <TouchableOpacity onPress={() => setIsCategoryPickerVisible(false)} style={styles.closePickerButton}>
-                      <Text style={styles.closePickerButtonText}>✕</Text>
+                      <Text style={[styles.closePickerButtonText, { color: theme.trim }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
                   <ScrollView style={styles.pickerScrollView}>
@@ -513,7 +518,7 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                         key={index}
                         style={[
                           styles.pickerItem,
-                          editCategory === cat && styles.pickerItemSelected
+                          editCategory === cat && { backgroundColor: `${theme.trim}1A` }
                         ]}
                         onPress={() => {
                           setEditCategory(cat);
@@ -522,11 +527,12 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                       >
                         <Text style={[
                           styles.pickerItemText,
+                          { color: theme.trim },
                           editCategory === cat && styles.pickerItemTextSelected
                         ]}>
                           {cat}
                         </Text>
-                        {editCategory === cat && <Text style={styles.checkIcon}>✓</Text>}
+                        {editCategory === cat && <Text style={[styles.checkIcon, { color: theme.trim }]}>✓</Text>}
                       </TouchableOpacity>
                     ))}
                   </ScrollView>

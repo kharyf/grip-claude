@@ -7,6 +7,7 @@ import { Amplify } from 'aws-amplify';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
@@ -51,6 +52,7 @@ const CURRENCY_SYMBOLS = {
 };
 
 function AppContent() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('Spending');
   const [menuVisible, setMenuVisible] = useState(false);
   const [chartType, setChartType] = useState('Pie');
@@ -179,9 +181,9 @@ function AppContent() {
   // Show loading screen during initial auth check
   if (isLoading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.appTitle}>Gripah</Text>
-        <Text style={[styles.tabText, { marginTop: 10 }]}>Loading...</Text>
+      <View style={[styles.container, { backgroundColor: theme.main, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={[styles.appTitle, { color: theme.trim }]}>Gripah</Text>
+        <Text style={[styles.tabText, { color: theme.trim, marginTop: 10 }]}>Loading...</Text>
       </View>
     );
   }
@@ -202,18 +204,18 @@ function AppContent() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.secondary }]}>
       <StatusBar style="light" />
 
       {/* App Title */}
-      <View style={styles.titleContainer}>
+      <View style={[styles.titleContainer, { backgroundColor: theme.main, borderBottomColor: theme.trim }]}>
         <TouchableOpacity
           style={styles.userIconButton}
           onPress={() => setMenuVisible(true)}
           testID="userMenuButton"
         >
-          <View style={styles.userIcon}>
-            <Text style={styles.userIconText}>{userInitial}</Text>
+          <View style={[styles.userIcon, { backgroundColor: theme.trim, borderColor: theme.main }]}>
+            <Text style={[styles.userIconText, { color: theme.main }]}>{userInitial}</Text>
           </View>
         </TouchableOpacity>
         <Image
@@ -225,30 +227,30 @@ function AppContent() {
       </View>
 
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { borderBottomColor: theme.trim, backgroundColor: theme.main }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'Spending' && styles.activeTab]}
+          style={[styles.tab, { borderRightColor: theme.trim, borderLeftColor: theme.trim }, activeTab === 'Spending' && [styles.activeTab, { borderBottomColor: theme.trim, backgroundColor: theme.secondary, borderTopColor: theme.trim }]]}
           onPress={() => setActiveTab('Spending')}
         >
-          <Text style={[styles.tabText, activeTab === 'Spending' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: theme.trim }, activeTab === 'Spending' && styles.activeTabText]}>
             Spending
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'Scanner' && styles.activeTab]}
+          style={[styles.tab, { borderRightColor: theme.trim, borderLeftColor: theme.trim }, activeTab === 'Scanner' && [styles.activeTab, { borderBottomColor: theme.trim, backgroundColor: theme.secondary, borderTopColor: theme.trim }]]}
           onPress={() => setActiveTab('Scanner')}
         >
-          <Text style={[styles.tabText, activeTab === 'Scanner' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: theme.trim }, activeTab === 'Scanner' && styles.activeTabText]}>
             Scanner
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'Settings' && styles.activeTab]}
+          style={[styles.tab, { borderRightColor: theme.trim, borderLeftColor: theme.trim }, activeTab === 'Settings' && [styles.activeTab, { borderBottomColor: theme.trim, backgroundColor: theme.secondary, borderTopColor: theme.trim }]]}
           onPress={() => setActiveTab('Settings')}
         >
-          <Text style={[styles.tabText, activeTab === 'Settings' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: theme.trim }, activeTab === 'Settings' && styles.activeTabText]}>
             Settings
           </Text>
         </TouchableOpacity>
@@ -261,7 +263,7 @@ function AppContent() {
 
       {/* Banner Ad - Only for free users */}
       {status !== 'active' && (
-        <View style={styles.adContainer}>
+        <View style={[styles.adContainer, { backgroundColor: theme.main, borderTopColor: theme.trim }]}>
           <BannerAd
             unitId={TestIds.BANNER}
             size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -284,17 +286,17 @@ function AppContent() {
           activeOpacity={1}
           onPress={() => setMenuVisible(false)}
         >
-          <View style={styles.menuContainer}>
-            <View style={styles.menuItem}>
+          <View style={[styles.menuContainer, { backgroundColor: theme.main, borderColor: theme.trim }]}>
+            <View style={[styles.menuItem, { borderBottomColor: theme.trim }]}>
               <Text style={styles.menuIcon}>📧</Text>
-              <Text style={styles.menuText} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={[styles.menuText, { color: theme.trim }]} numberOfLines={1} ellipsizeMode="tail">
                 {userEmail}
               </Text>
             </View>
 
-            <View style={styles.menuItem}>
+            <View style={[styles.menuItem, { borderBottomColor: theme.trim }]}>
               <Text style={styles.menuIcon}>{status === 'active' ? '💎' : '👍'}</Text>
-              <Text style={styles.menuText}>
+              <Text style={[styles.menuText, { color: theme.trim }]}>
                 {status === 'active' ? 'Premium User' : 'Free User'}
               </Text>
             </View>
@@ -307,7 +309,7 @@ function AppContent() {
               }}
             >
               <Text style={styles.menuIcon}>🚪</Text>
-              <Text style={styles.menuText}>Log Out</Text>
+              <Text style={[styles.menuText, { color: theme.trim }]}>Log Out</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -364,13 +366,15 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <SubscriptionProvider>
-        <StripeProvider publishableKey={stripePubKey}>
-          <AppContent />
-        </StripeProvider>
-      </SubscriptionProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <StripeProvider publishableKey={stripePubKey}>
+            <AppContent />
+          </StripeProvider>
+        </SubscriptionProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
@@ -382,8 +386,8 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     backgroundColor: '#1a1a1a',
-    paddingVertical: 5,
-    paddingHorizontal: 20,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -413,8 +417,8 @@ const styles = StyleSheet.create({
     height: 40,
   },
   appLogo: {
-    height: 40,
-    width: 160,
+    height: 65,
+    width: 210,
   },
   tabContainer: {
     flexDirection: 'row',
