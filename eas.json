@@ -19,6 +19,9 @@
       "env": {
         "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00",
         "EXPO_PUBLIC_API_URL": "https://gr-f1dda9023cb9481db8f60033be624a9b.ecs.us-east-1.on.aws"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     },
     "production": {

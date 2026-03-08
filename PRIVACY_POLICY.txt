@@ -1,0 +1,47 @@
+PRIVACY POLICY FOR GRIPAH
+Last Updated: March 8, 2026
+
+1. INTRODUCTION
+Gripah ("the App") is a personal finance management tool designed to help users track their spending. This Privacy Policy explains how we collect, use, and share information when you use our mobile application.
+
+2. INFORMATION COLLECTION AND USE
+The app collects information to provide its services to you. No camera or spending data is ever transmitted away from your device.
+
+A. Camera and Image Data
+Gripah requests access to your device's camera and photo library specifically for the "Scanner" feature. 
+- Purpose: To capture or select images of receipts for automatic spending entry.
+- Processing: Receipt images are processed locally on your device using on-device machine learning (ML Kit) to extract text (OCR). 
+- Retention: Images are used temporarily during the scanning process. Gripah does not permanently store original receipt images in your device's persistent gallery.
+
+B. User-Provided Information
+When you create an account, we collect:
+- Email address
+- Name (optional)
+- Login credentials (managed via AWS Cognito)
+- No Gripah employee will ever see or ask for your password.
+
+C. Spending Data
+Information about your spending categories, item names, dates, and amounts is stored locally on your device's persistent storage (AsyncStorage) to ensure fast access and privacy.
+
+3. THIRD-PARTY SERVICES AND DATA SHARING
+We integrate with the following third-party services to provide core app functionality:
+
+- Amazon Web Services (AWS): Used for secure user authentication (Cognito) and backend API services (AppSync). Your email and user ID are processed by AWS to manage your account.
+- Stripe: Used for processing subscription payments. When you subscribe to Premium, your payment details are handled directly by Stripe. Gripah does not see or store your credit card information.
+- Google AdMob: Used to display advertisements to users of the free version of the App. AdMob may collect and use device identifiers for advertising purposes.
+
+4. DATA RETENTION AND DELETION
+You have full control over your data within Gripah.
+
+A. Local Data Deletion
+- Scan History: You can clear your receipt scanning history at any time using the "Clear History" button in the Scanner tab.
+- Spending Records: You can delete individual spending items or entire categories in the Spending tab. You can delete your entire historical spending data at any time using the "Reset Now" button in the Settings tab.
+
+B. Account Deletion
+If you wish to delete your account and all associated data from our authentication systems, please contact support at support@gripah.com.
+
+C. Data Portability
+Your spending data remains on your device. Clearing the app cache or uninstalling the app will remove all locally stored spending data.
+
+5. CONTACT US
+If you have any questions about this Privacy Policy, please contact us at support@gripah.com.
