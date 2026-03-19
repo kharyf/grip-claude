@@ -2,6 +2,8 @@
  * Utility to parse raw OCR text from a receipt and extract key information.
  */
 
+import { parseAndFormatDate } from './dateFormatter';
+
 export const parseReceiptText = (text) => {
     if (!text) return null;
 
@@ -44,13 +46,55 @@ export const parseReceiptText = (text) => {
         amount = Math.max(...parsedAmounts).toFixed(2);
     }
 
-    // 3. Try to find the date
-    // Look for formats like MM/DD/YYYY, DD/MM/YYYY, etc.
-    const dateRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
-    const dateMatch = text.match(dateRegex);
-    if (dateMatch) {
-        date = dateMatch[1];
-    } else {
+    // 3. Try to find the date using multiple patterns
+    // Date regex patterns ordered from most specific to least specific
+    const datePatterns = [
+        // Written month: "Mar 18, 2026", "March 18 2026", "MAR 18, 2026", "Mar 18,2026"
+        /([A-Za-z]{3,9}\.?\s+\d{1,2},?\s*\d{2,4})/,
+        // Day-first written: "18 Mar 2026", "18 March 2026"
+        /(\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{2,4})/,
+        // ISO format: "2026-03-18", "2026/03/18"
+        /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+        // Numeric with dots: "03.18.2026", "18.03.2026"
+        /(\d{1,2}\.\d{1,2}\.\d{2,4})/,
+        // Numeric with slash or hyphen: "03/18/2026", "03-18-2026", "3/18/26"
+        /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
+    ];
+
+    // Helper: try all patterns against a string, return first valid formatted date
+    const extractDate = (str) => {
+        for (const pattern of datePatterns) {
+            const match = str.match(pattern);
+            if (match) {
+                const formatted = parseAndFormatDate(match[1]);
+                if (formatted && formatted !== '-') {
+                    return formatted;
+                }
+            }
+        }
+        return null;
+    };
+
+    // First pass: prioritize lines with date-related keywords
+    const dateKeywords = ['date', 'dt', 'dated'];
+    for (const line of lines) {
+        const lower = line.toLowerCase().trim();
+        if (dateKeywords.some(kw => lower.includes(kw))) {
+            const found = extractDate(line);
+            if (found) {
+                date = found;
+                break;
+            }
+        }
+    }
+
+    // Second pass: scan the full text if keyword search didn't find a date
+    if (!date) {
+        date = extractDate(text);
+    }
+
+    // Fallback: use today's date
+    if (!date) {
         date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 

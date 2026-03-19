@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserItem, setUserItem, removeUserItem } from '../utils/userStorage';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import mobileAds, { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { Picker } from '@react-native-picker/picker';
+import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useTheme } from '../context/ThemeContext';
 import { parseReceiptText } from '../utils/receiptParser';
 import { BASE_CATEGORIES } from '../utils/defaults';
+import { parseAndFormatDate } from '../utils/dateFormatter';
 
 const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
   requestNonPersonalizedAdsOnly: true,
@@ -16,6 +19,8 @@ const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
 
 const ChatTab = ({ currencySymbol = '$' }) => {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const userId = user?.userId;
   const { status } = useSubscription();
   const [messages, setMessages] = useState([
     {
@@ -75,12 +80,16 @@ const ChatTab = ({ currencySymbol = '$' }) => {
     };
   }, []);
 
-  // Load scanner history and categories on mount
+  // Load scanner history and categories
   useEffect(() => {
     const loadData = async () => {
+      if (!userId) {
+          setIsDataLoaded(true);
+          return;
+      }
       try {
         // 1. Load Messages
-        const savedMessages = await AsyncStorage.getItem('scanner_messages');
+        const savedMessages = await getUserItem(userId, 'scanner_messages');
         if (savedMessages !== null) {
           const parsed = JSON.parse(savedMessages).map(m => ({
             ...m,
@@ -90,7 +99,7 @@ const ChatTab = ({ currencySymbol = '$' }) => {
         }
 
         // 2. Load Categories
-        const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+        const savedCustomCategories = await getUserItem(userId, 'customCategories');
         if (savedCustomCategories !== null) {
           const custom = JSON.parse(savedCustomCategories);
           const baseCategories = BASE_CATEGORIES.map(c => c.name);
@@ -103,23 +112,23 @@ const ChatTab = ({ currencySymbol = '$' }) => {
       }
     };
     loadData();
-  }, []);
+  }, [userId]);
 
   // Save scanner history whenever messages change
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isDataLoaded || !userId) return;
 
     const saveMessages = async () => {
       try {
         // Filter out temporary processing messages
         const persistentMessages = messages.filter(m => !m.text.includes('Processing receipt'));
-        await AsyncStorage.setItem('scanner_messages', JSON.stringify(persistentMessages));
+        await setUserItem(userId, 'scanner_messages', JSON.stringify(persistentMessages));
       } catch (error) {
         console.error('Failed to save scanner history:', error);
       }
     };
     saveMessages();
-  }, [messages, isDataLoaded]);
+  }, [messages, isDataLoaded, userId]);
 
 
   const showScanOptions = async () => {
@@ -289,7 +298,9 @@ const ChatTab = ({ currencySymbol = '$' }) => {
           style: "destructive",
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('scanner_messages');
+              if (userId) {
+                await removeUserItem(userId, 'scanner_messages');
+              }
               setMessages([
                 {
                   id: 1,
@@ -307,6 +318,15 @@ const ChatTab = ({ currencySymbol = '$' }) => {
     );
   };
 
+  const handleDateEndEditing = () => {
+    if (editDate.trim()) {
+      const formatted = parseAndFormatDate(editDate);
+      if (formatted && formatted !== '-') {
+        setEditDate(formatted);
+      }
+    }
+  };
+
   const handleConfirmReceipt = async () => {
     try {
       const amount = parseFloat(editAmount);
@@ -315,9 +335,13 @@ const ChatTab = ({ currencySymbol = '$' }) => {
         return;
       }
 
+      // Reformat date before saving
+      const formattedDate = parseAndFormatDate(editDate);
+      const finalDate = (formattedDate && formattedDate !== '-') ? formattedDate : editDate;
+
       // 1. Get existing data
-      const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
-      const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+      const savedCategoryItems = await getUserItem(userId, 'categoryItems');
+      const savedCustomCategories = await getUserItem(userId, 'customCategories');
       let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
       const customCategories = savedCustomCategories ? JSON.parse(savedCustomCategories) : [];
 
@@ -328,14 +352,14 @@ const ChatTab = ({ currencySymbol = '$' }) => {
       const newItem = {
         id: Date.now(),
         name: editMerchant,
-        date: editDate,
+        date: finalDate,
         amount: amount,
         isBase: false,
       };
 
       // 5. Save
       categoryItems[category] = [...(categoryItems[category] || []), newItem];
-      await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
+      await setUserItem(userId, 'categoryItems', JSON.stringify(categoryItems));
 
       // 6. Update chat
       const confirmationMessage = {
@@ -476,6 +500,7 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                   style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editDate}
                   onChangeText={setEditDate}
+                  onEndEditing={handleDateEndEditing}
                   placeholder="e.g., Dec 25, 2024"
                   placeholderTextColor="#666"
                 />

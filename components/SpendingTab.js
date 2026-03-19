@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserItem, setUserItem } from '../utils/userStorage';
+import { useAuth } from '../context/AuthContext';
 import { PieChart, BarChart, LineChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import { getDefaultCategoryItems, BASE_CATEGORIES } from '../utils/defaults';
 import { useTheme } from '../context/ThemeContext';
+import { parseAndFormatDate } from '../utils/dateFormatter';
 
 const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const userId = user?.userId;
   // Initialize with base items for all categories
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -28,12 +33,16 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   const [timeRangeModalVisible, setTimeRangeModalVisible] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  // Load data from AsyncStorage on mount
+  // Load data from AsyncStorage on mount or when user changes
   useEffect(() => {
     const loadData = async () => {
+      if (!userId) {
+          setIsDataLoaded(true);
+          return;
+      }
       try {
-        const savedCategoryItems = await AsyncStorage.getItem('categoryItems');
-        const savedCustomCategories = await AsyncStorage.getItem('customCategories');
+        const savedCategoryItems = await getUserItem(userId, 'categoryItems');
+        const savedCustomCategories = await getUserItem(userId, 'customCategories');
 
         if (savedCategoryItems !== null) {
           let items = JSON.parse(savedCategoryItems);
@@ -50,22 +59,22 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
       }
     };
     loadData();
-  }, []);
+  }, [userId]);
 
   // Save data to AsyncStorage whenever it changes
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isDataLoaded || !userId) return;
 
     const saveData = async () => {
       try {
-        await AsyncStorage.setItem('categoryItems', JSON.stringify(categoryItems));
-        await AsyncStorage.setItem('customCategories', JSON.stringify(customCategories));
+        await setUserItem(userId, 'categoryItems', JSON.stringify(categoryItems));
+        await setUserItem(userId, 'customCategories', JSON.stringify(customCategories));
       } catch (error) {
         console.error('Failed to save spending data:', error);
       }
     };
     saveData();
-  }, [categoryItems, customCategories, isDataLoaded]);
+  }, [categoryItems, customCategories, isDataLoaded, userId]);
 
   const baseSpendingData = BASE_CATEGORIES.map(cat => ({
     name: cat.name,
@@ -248,89 +257,24 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
     setNewCategoryName('');
   };
 
-  // Helper function to parse and format dates
-  const parseAndFormatDate = (dateInput) => {
-    if (!dateInput || !dateInput.trim()) {
-      // If no date provided, return hyphen
-      return '-';
-    }
-
-    const input = dateInput.trim();
-    let parsedDate = null;
-
-    // Try various date formats
-    // Format: "Dec 25", "Dec 25,", "December 25"
-    const monthDayMatch = input.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})?$/);
-    if (monthDayMatch) {
-      const monthStr = monthDayMatch[1];
-      const day = parseInt(monthDayMatch[2]);
-      const year = monthDayMatch[3] ? parseInt(monthDayMatch[3]) : new Date().getFullYear();
-
-      // Try to parse the month
-      const monthMap = {
-        'jan': 0, 'january': 0,
-        'feb': 1, 'february': 1,
-        'mar': 2, 'march': 2,
-        'apr': 3, 'april': 3,
-        'may': 4,
-        'jun': 5, 'june': 5,
-        'jul': 6, 'july': 6,
-        'aug': 7, 'august': 7,
-        'sep': 8, 'sept': 8, 'september': 8,
-        'oct': 9, 'october': 9,
-        'nov': 10, 'november': 10,
-        'dec': 11, 'december': 11
-      };
-
-      const month = monthMap[monthStr.toLowerCase()];
-      if (month !== undefined && day >= 1 && day <= 31) {
-        parsedDate = new Date(year, month, day);
+  // Auto-reformat date on blur for add-item field
+  const handleNewItemDateEndEditing = () => {
+    if (newItemDate.trim()) {
+      const formatted = parseAndFormatDate(newItemDate);
+      if (formatted && formatted !== '-') {
+        setNewItemDate(formatted);
       }
     }
+  };
 
-    // Format: "12/25", "12/25/2024", "12-25", "12-25-2024"
-    const numericMatch = input.match(/^(\d{1,2})[\/\-](\d{1,2})([\/\-](\d{2,4}))?$/);
-    if (!parsedDate && numericMatch) {
-      const month = parseInt(numericMatch[1]) - 1; // months are 0-indexed
-      const day = parseInt(numericMatch[2]);
-      let year = new Date().getFullYear();
-
-      if (numericMatch[4]) {
-        year = parseInt(numericMatch[4]);
-        if (year < 100) {
-          year += 2000; // Convert 2-digit year to 4-digit
-        }
-      }
-
-      if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
-        parsedDate = new Date(year, month, day);
+  // Auto-reformat date on blur for edit-item field
+  const handleEditItemDateEndEditing = () => {
+    if (editItemDate.trim()) {
+      const formatted = parseAndFormatDate(editItemDate);
+      if (formatted && formatted !== '-') {
+        setEditItemDate(formatted);
       }
     }
-
-    // Format: "2024-12-25" (ISO format)
-    const isoMatch = input.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-    if (!parsedDate && isoMatch) {
-      const year = parseInt(isoMatch[1]);
-      const month = parseInt(isoMatch[2]) - 1;
-      const day = parseInt(isoMatch[3]);
-
-      if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
-        parsedDate = new Date(year, month, day);
-      }
-    }
-
-    // Try native Date parsing as last resort
-    if (!parsedDate) {
-      parsedDate = new Date(input);
-    }
-
-    // Validate the parsed date
-    if (parsedDate && !isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-
-    // If all parsing fails, return null to indicate invalid date
-    return null;
   };
 
   const handleAddItem = () => {
@@ -808,6 +752,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={newItemDate}
                   onChangeText={setNewItemDate}
+                  onEndEditing={handleNewItemDateEndEditing}
                   placeholder="e.g., Dec 25, 2024 or 12/25/2024"
                   placeholderTextColor="#666"
                 />
@@ -895,6 +840,7 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                   style={[styles.input, { backgroundColor: theme.secondary, borderColor: theme.trim, color: theme.trim }]}
                   value={editItemDate}
                   onChangeText={setEditItemDate}
+                  onEndEditing={handleEditItemDateEndEditing}
                   placeholder="e.g., Dec 25, 2024 or 12/25/2024"
                   placeholderTextColor="#666"
                 />

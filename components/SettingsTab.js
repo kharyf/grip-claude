@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setUserItem } from '../utils/userStorage';
 import { Picker } from '@react-native-picker/picker';
 import { getDefaultCategoryItems } from '../utils/defaults';
 import { useAuth } from '../context/AuthContext';
@@ -25,7 +26,8 @@ const COLOR_ROLES = [
 ];
 
 const SettingsTab = ({ currency, onCurrencyChange }) => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const userId = user?.userId;
   const { status, subscription } = useSubscription();
   const { theme, setThemeColor, resetTheme } = useTheme();
 
@@ -37,9 +39,10 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
 
   const handleResetDatabase = async () => {
     try {
+      if (!userId) return;
       const defaultItems = getDefaultCategoryItems();
-      await AsyncStorage.setItem('categoryItems', JSON.stringify(defaultItems));
-      await AsyncStorage.setItem('customCategories', JSON.stringify([]));
+      await setUserItem(userId, 'categoryItems', JSON.stringify(defaultItems));
+      await setUserItem(userId, 'customCategories', JSON.stringify([]));
       setResetModalVisible(false);
       Alert.alert('Success', 'Database has been reset. Please restart the app or navigate back to Spending tab to see changes.');
     } catch (error) {

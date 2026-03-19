@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserItem, setUserItem } from './utils/userStorage';
 import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { Amplify } from 'aws-amplify';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
@@ -53,6 +53,20 @@ const CURRENCY_SYMBOLS = {
 
 function AppContent() {
   const { theme } = useTheme();
+  const {
+    user,
+    login,
+    register,
+    confirmAccount,
+    forgotPassword,
+    logout,
+    isLoading,
+    isAuthenticating,
+    error: authError,
+    needsConfirmation,
+  } = useAuth();
+  const { status, checkStatus } = useSubscription();
+
   const [activeTab, setActiveTab] = useState('Spending');
   const [menuVisible, setMenuVisible] = useState(false);
   const [chartType, setChartType] = useState('Pie');
@@ -69,7 +83,7 @@ function AppContent() {
 
     const loadCurrency = async () => {
       try {
-        const savedCurrency = await AsyncStorage.getItem('currency');
+        const savedCurrency = await getUserItem(user?.userId, 'currency');
         if (savedCurrency) {
           setCurrency(savedCurrency);
         }
@@ -80,12 +94,12 @@ function AppContent() {
       }
     };
     loadCurrency();
-  }, []);
+  }, [user?.userId]);
 
   const handleCurrencyChange = async (newCurrency) => {
     setCurrency(newCurrency);
     try {
-      await AsyncStorage.setItem('currency', newCurrency);
+      await setUserItem(user?.userId, 'currency', newCurrency);
     } catch (error) {
       console.error('Failed to save currency:', error);
     }
@@ -112,20 +126,6 @@ function AppContent() {
         return <SpendingTab chartType={chartType} currencySymbol={currencySymbol} />;
     }
   };
-
-  const {
-    user,
-    login,
-    register,
-    confirmAccount,
-    forgotPassword,
-    logout,
-    isLoading,
-    isAuthenticating,
-    error: authError,
-    needsConfirmation,
-  } = useAuth();
-  const { status, checkStatus } = useSubscription();
 
   useEffect(() => {
     const handleDeepLink = async ({ url }) => {

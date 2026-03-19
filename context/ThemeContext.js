@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserKey } from '../utils/userStorage';
+import { useAuth } from './AuthContext';
 
 const DEFAULT_THEME = {
   main: '#1a1a1a',       // Main: deep black backgrounds
@@ -12,13 +14,16 @@ const STORAGE_KEY = 'appThemeColors';
 const ThemeContext = createContext(null);
 
 export const ThemeProvider = ({ children }) => {
+  const { user } = useAuth();
+  const userId = user?.userId;
   const [theme, setTheme] = useState(DEFAULT_THEME);
 
-  // Load persisted colors on mount
+  // Load persisted colors on mount or when userId changes
   useEffect(() => {
     const loadTheme = async () => {
+      if (!userId) return; // Don't load if no user
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        const saved = await AsyncStorage.getItem(getUserKey(userId, STORAGE_KEY));
         if (saved) {
           const parsed = JSON.parse(saved);
           setTheme({ ...DEFAULT_THEME, ...parsed });
@@ -28,7 +33,7 @@ export const ThemeProvider = ({ children }) => {
       }
     };
     loadTheme();
-  }, []);
+  }, [userId]);
 
   // Update one color role and persist, ensuring uniqueness via swap logic
   const setThemeColor = async (role, hex) => {
@@ -47,9 +52,11 @@ export const ThemeProvider = ({ children }) => {
       updated[role] = hex;
 
       // Persist the update
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(e => {
-        console.error('Failed to save theme:', e);
-      });
+      if (userId) {
+        AsyncStorage.setItem(getUserKey(userId, STORAGE_KEY), JSON.stringify(updated)).catch(e => {
+          console.error('Failed to save theme:', e);
+        });
+      }
 
       return updated;
     });
@@ -58,8 +65,9 @@ export const ThemeProvider = ({ children }) => {
   // Reset to defaults
   const resetTheme = async () => {
     setTheme(DEFAULT_THEME);
+    if (!userId) return;
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
+      await AsyncStorage.removeItem(getUserKey(userId, STORAGE_KEY));
     } catch (e) {
       console.error('Failed to reset theme:', e);
     }
