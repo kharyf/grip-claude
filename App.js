@@ -8,6 +8,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { Amplify } from 'aws-amplify';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
 import SettingsTab from './components/SettingsTab';
@@ -39,7 +40,7 @@ try {
   console.error('Amplify configuration failed:', e.name, e.message);
 }
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gr-f1dda9023cb9481db8f60033be624a9b.ecs.us-east-1.on.aws';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gripahserver-98886831409.us-west1.run.app';
 const FALLBACK_STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
 
 
@@ -366,15 +367,15 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <SubscriptionProvider>
           <StripeProvider publishableKey={stripePubKey}>
             <AppContent />
           </StripeProvider>
         </SubscriptionProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
