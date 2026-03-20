@@ -21,15 +21,21 @@ export const ThemeProvider = ({ children }) => {
   // Load persisted colors on mount or when userId changes
   useEffect(() => {
     const loadTheme = async () => {
-      if (!userId) return; // Don't load if no user
+      if (!userId) {
+        setTheme(DEFAULT_THEME);
+        return;
+      }
       try {
         const saved = await AsyncStorage.getItem(getUserKey(userId, STORAGE_KEY));
         if (saved) {
           const parsed = JSON.parse(saved);
           setTheme({ ...DEFAULT_THEME, ...parsed });
+        } else {
+          setTheme(DEFAULT_THEME);
         }
       } catch (e) {
         console.error('Failed to load theme:', e);
+        setTheme(DEFAULT_THEME);
       }
     };
     loadTheme();

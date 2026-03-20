@@ -83,11 +83,20 @@ const ChatTab = ({ currencySymbol = '$' }) => {
   // Load scanner history and categories
   useEffect(() => {
     const loadData = async () => {
-      if (!userId) {
-          setIsDataLoaded(true);
-          return;
-      }
       try {
+        if (!userId) {
+          setMessages([
+            {
+              id: 1,
+              text: "Hello! I'm your AI assistant. Take a picture of your latest receipt and I'll add it to your database.",
+              isUser: false,
+              timestamp: new Date(),
+            },
+          ]);
+          setAllCategories(BASE_CATEGORIES.map(c => c.name));
+          return;
+        }
+
         // 1. Load Messages
         const savedMessages = await getUserItem(userId, 'scanner_messages');
         if (savedMessages !== null) {
@@ -96,14 +105,25 @@ const ChatTab = ({ currencySymbol = '$' }) => {
             timestamp: new Date(m.timestamp)
           }));
           setMessages(parsed);
+        } else {
+          setMessages([
+            {
+              id: 1,
+              text: "Hello! I'm your AI assistant. Take a picture of your latest receipt and I'll add it to your database.",
+              isUser: false,
+              timestamp: new Date(),
+            },
+          ]);
         }
 
         // 2. Load Categories
         const savedCustomCategories = await getUserItem(userId, 'customCategories');
+        const baseCategories = BASE_CATEGORIES.map(c => c.name);
         if (savedCustomCategories !== null) {
           const custom = JSON.parse(savedCustomCategories);
-          const baseCategories = BASE_CATEGORIES.map(c => c.name);
           setAllCategories([...baseCategories, ...custom.map(c => c.name)]);
+        } else {
+          setAllCategories(baseCategories);
         }
       } catch (error) {
         console.error('Failed to load initial data:', error);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setUserItem } from '../utils/userStorage';
+import { setUserItem, removeUserItem } from '../utils/userStorage';
 import { Picker } from '@react-native-picker/picker';
 import { getDefaultCategoryItems } from '../utils/defaults';
 import { useAuth } from '../context/AuthContext';
@@ -43,6 +43,9 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
       const defaultItems = getDefaultCategoryItems();
       await setUserItem(userId, 'categoryItems', JSON.stringify(defaultItems));
       await setUserItem(userId, 'customCategories', JSON.stringify([]));
+      await setUserItem(userId, 'autopays', JSON.stringify([]));
+      await setUserItem(userId, 'annualAutopays', JSON.stringify([]));
+      await removeUserItem(userId, 'lastAutopayCheckDate');
       setResetModalVisible(false);
       Alert.alert('Success', 'Database has been reset. Please restart the app or navigate back to Spending tab to see changes.');
     } catch (error) {
@@ -237,7 +240,7 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             <View style={[styles.resetModalContainer, { backgroundColor: theme.main }]}>
               <Text style={styles.resetModalTitle}>Warning</Text>
               <Text style={styles.resetModalText}>
-                This will permanently delete all your spending data and custom categories. This action cannot be undone.
+                This will permanently delete all your spending data, autopays, and custom categories. This action cannot be undone.
               </Text>
               <View style={styles.resetModalButtons}>
                 <TouchableOpacity

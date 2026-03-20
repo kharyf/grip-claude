@@ -36,24 +36,33 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
   // Load data from AsyncStorage on mount or when user changes
   useEffect(() => {
     const loadData = async () => {
-      if (!userId) {
-          setIsDataLoaded(true);
-          return;
-      }
       try {
+        if (!userId) {
+          setCategoryItems(getDefaultCategoryItems());
+          setCustomCategories([]);
+          return;
+        }
+
         const savedCategoryItems = await getUserItem(userId, 'categoryItems');
         const savedCustomCategories = await getUserItem(userId, 'customCategories');
 
         if (savedCategoryItems !== null) {
           let items = JSON.parse(savedCategoryItems);
           setCategoryItems(items);
+        } else {
+          setCategoryItems(getDefaultCategoryItems());
         }
+
         if (savedCustomCategories !== null) {
           let custom = JSON.parse(savedCustomCategories);
           setCustomCategories(custom);
+        } else {
+          setCustomCategories([]);
         }
       } catch (error) {
         console.error('Failed to load spending data:', error);
+        setCategoryItems(getDefaultCategoryItems());
+        setCustomCategories([]);
       } finally {
         setIsDataLoaded(true);
       }
@@ -688,16 +697,16 @@ const SpendingTab = ({ chartType = 'Pie', currencySymbol = '$' }) => {
                     </View>
                     <Text style={[styles.itemAmount, { color: theme.trim }]}>{currencySymbol}{item.amount}</Text>
                     <TouchableOpacity
-                      style={styles.editButton}
+                      style={[styles.editButton, { borderColor: theme.trim }]}
                       onPress={() => openEditItemModal(selectedCategory, item)}
                     >
-                      <Text style={[styles.editButtonText, { color: theme.main }]}>✎</Text>
+                      <Text style={[styles.editButtonText, { color: theme.trim }]}>✎</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.removeButton}
+                      style={[styles.removeButton, { borderColor: '#FF3B30' }]}
                       onPress={() => handleRemoveItem(selectedCategory, item.id)}
                     >
-                      <Text style={styles.removeButtonText}>✕</Text>
+                      <Text style={[styles.removeButtonText, { color: '#FF3B30' }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -1119,31 +1128,27 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   editButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFD700',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   editButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: 12,
   },
   removeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FF0000',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: 12,
   },
   totalRow: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserItem, setUserItem } from './utils/userStorage';
@@ -11,6 +11,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Amplify } from 'aws-amplify';
 import SpendingTab from './components/SpendingTab';
 import ChatTab from './components/ChatTab';
+import AutopayTab from './components/AutopayTab';
 import SettingsTab from './components/SettingsTab';
 import LoginScreen from './components/LoginScreen';
 
@@ -84,18 +85,140 @@ function AppContent() {
 
     const loadCurrency = async () => {
       try {
+        if (!user?.userId) {
+          setCurrency('USD');
+          return;
+        }
         const savedCurrency = await getUserItem(user?.userId, 'currency');
         if (savedCurrency) {
           setCurrency(savedCurrency);
+        } else {
+          setCurrency('USD');
         }
       } catch (error) {
         console.error('Failed to load currency:', error);
+        setCurrency('USD');
       } finally {
         setIsLoaded(true);
       }
     };
     loadCurrency();
   }, [user?.userId]);
+
+  const checkAutopays = async () => {
+    if (!user?.userId) return;
+    
+    try {
+      const lastCheck = await getUserItem(user.userId, 'lastAutopayCheckDate');
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      if (lastCheck === todayStr) return;
+      
+      const autopaysStr = await getUserItem(user.userId, 'autopays');
+      const annualAutopaysStr = await getUserItem(user.userId, 'annualAutopays');
+      
+      const autopays = autopaysStr ? JSON.parse(autopaysStr) : [];
+      const annualAutopays = annualAutopaysStr ? JSON.parse(annualAutopaysStr) : [];
+      
+      if (autopays.length === 0 && annualAutopays.length === 0) {
+        await setUserItem(user.userId, 'lastAutopayCheckDate', todayStr);
+        return;
+      }
+      
+      const categoryItemsStr = await getUserItem(user.userId, 'categoryItems');
+      let categoryItems = categoryItemsStr ? JSON.parse(categoryItemsStr) : {};
+      
+      let startDate;
+      if (!lastCheck) {
+        startDate = new Date(today);
+      } else {
+        startDate = new Date(lastCheck);
+        startDate.setDate(startDate.getDate() + 1);
+      }
+      
+      let currentProcessingDate = new Date(startDate);
+      currentProcessingDate.setHours(0, 0, 0, 0);
+      const comparisonToday = new Date(today);
+      comparisonToday.setHours(0, 0, 0, 0);
+      
+      let modified = false;
+      const monthMap = {
+        'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
+        'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+      };
+      
+      while (currentProcessingDate <= comparisonToday) {
+        const dayOfMonth = currentProcessingDate.getDate();
+        const year = currentProcessingDate.getFullYear();
+        const monthIndex = currentProcessingDate.getMonth();
+        const isLastDay = new Date(year, monthIndex + 1, 0).getDate() === dayOfMonth;
+        
+        const dateStr = currentProcessingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        
+        // Process Monthly
+        autopays.forEach(ap => {
+          const shouldTrigger = (ap.day === dayOfMonth) || (ap.day > dayOfMonth && isLastDay);
+          if (shouldTrigger) {
+            const newItem = {
+              id: `ap-${ap.id}-${currentProcessingDate.getTime()}`,
+              name: ap.name,
+              date: dateStr,
+              amount: ap.amount,
+              isBase: false,
+            };
+            if (!categoryItems[ap.category]) categoryItems[ap.category] = [];
+            categoryItems[ap.category].push(newItem);
+            modified = true;
+          }
+        });
+
+        // Process Annual
+        annualAutopays.forEach(ap => {
+          const targetMonth = monthMap[ap.month];
+          if (targetMonth === monthIndex) {
+            const shouldTrigger = (ap.day === dayOfMonth) || (ap.day > dayOfMonth && isLastDay);
+            if (shouldTrigger) {
+              const newItem = {
+                id: `aap-${ap.id}-${currentProcessingDate.getTime()}`,
+                name: ap.name,
+                date: dateStr,
+                amount: ap.amount,
+                isBase: false,
+              };
+              if (!categoryItems[ap.category]) categoryItems[ap.category] = [];
+              categoryItems[ap.category].push(newItem);
+              modified = true;
+            }
+          }
+        });
+        
+        currentProcessingDate.setDate(currentProcessingDate.getDate() + 1);
+      }
+      
+      if (modified) {
+        await setUserItem(user.userId, 'categoryItems', JSON.stringify(categoryItems));
+      }
+      await setUserItem(user.userId, 'lastAutopayCheckDate', todayStr);
+      
+    } catch (e) {
+      console.error('Failed to process autopays:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.userId && isLoaded) {
+      checkAutopays();
+      
+      const subscription = AppState.addEventListener('change', nextAppState => {
+        if (nextAppState === 'active') {
+          checkAutopays();
+        }
+      });
+      
+      return () => subscription.remove();
+    }
+  }, [user?.userId, isLoaded]);
 
   const handleCurrencyChange = async (newCurrency) => {
     setCurrency(newCurrency);
@@ -114,6 +237,8 @@ function AppContent() {
     switch (activeTab) {
       case 'Spending':
         return <SpendingTab chartType={chartType} currencySymbol={currencySymbol} />;
+      case 'Autopays':
+        return <AutopayTab />;
       case 'Scanner':
         return <ChatTab currencySymbol={currencySymbol} />;
       case 'Settings':
@@ -235,6 +360,15 @@ function AppContent() {
         >
           <Text style={[styles.tabText, { color: theme.trim }, activeTab === 'Spending' && styles.activeTabText]}>
             Spending
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, { borderRightColor: theme.trim, borderLeftColor: theme.trim }, activeTab === 'Autopays' && [styles.activeTab, { borderBottomColor: theme.trim, backgroundColor: theme.secondary, borderTopColor: theme.trim }]]}
+          onPress={() => setActiveTab('Autopays')}
+        >
+          <Text style={[styles.tabText, { color: theme.trim }, activeTab === 'Autopays' && styles.activeTabText]}>
+            Autopays
           </Text>
         </TouchableOpacity>
 
