@@ -12,8 +12,9 @@ import SubscriptionScreen from './SubscriptionScreen';
 const ALL_SWATCHES = [
   '#0d0d0d', '#1a1a1a', '#2c2c2c', '#3d3d3d',
   '#1a0a2e', '#0a1a2e', '#0a2e1a', '#2e0a1a',
-  '#1f1f1f', '#2a2a2a', '#333333', '#3f3f3f',
   '#1e2a1e', '#1e1e2e', '#2e2e1e', '#2e1e1e',
+  '#6A5ACD', '#2E8B57', '#CD5C5C', '#F4A460',
+  '#4682B4', '#BA55D3', '#BC8F8F', '#5F9EA0',
   '#32CD32', '#00BFFF', '#FF6B35', '#FFD700',
   '#FF3CAC', '#A78BFA', '#00E5CC', '#FFFFFF',
   '#FF4444', '#FFA500', '#4FC3F7', '#80CBC4',
