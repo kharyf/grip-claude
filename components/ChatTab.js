@@ -347,6 +347,72 @@ const ChatTab = ({ currencySymbol = '$' }) => {
     }
   };
 
+  const handleAddNewCategory = () => {
+    Alert.prompt(
+      "New Category",
+      "Enter a name for the new category:",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Add",
+          onPress: async (categoryName) => {
+            if (!categoryName || categoryName.trim() === "") {
+              Alert.alert("Invalid Name", "Category name cannot be empty.");
+              return;
+            }
+
+            const trimmedName = categoryName.trim();
+            if (allCategories.includes(trimmedName)) {
+              Alert.alert("Already Exists", "This category already exists.");
+              return;
+            }
+
+            try {
+              // 1. Get existing custom categories
+              const savedCustomCategories = await getUserItem(userId, 'customCategories');
+              let customCategories = savedCustomCategories ? JSON.parse(savedCustomCategories) : [];
+              
+              // 2. Add new category with a vibrant color
+              const colors = [
+                '#FF6347', '#4169E1', '#32CD32', '#FF69B4', '#FF8C00',
+                '#9370DB', '#00CED1', '#FFD700', '#DC143C', '#7FFF00',
+                '#FF1493', '#00BFFF', '#ADFF2F', '#FF4500', '#DA70D6',
+              ];
+              const randomColor = colors[Math.floor(Math.random() * colors.length)];
+              
+              const newCategory = { name: trimmedName, color: randomColor };
+              customCategories.push(newCategory);
+              
+              // 3. Save to AsyncStorage
+              await setUserItem(userId, 'customCategories', JSON.stringify(customCategories));
+              
+              // 4. Update SpendingTab compatibility (categoryItems)
+              const savedCategoryItems = await getUserItem(userId, 'categoryItems');
+              let categoryItems = savedCategoryItems ? JSON.parse(savedCategoryItems) : {};
+              if (!categoryItems[trimmedName]) {
+                categoryItems[trimmedName] = [];
+                await setUserItem(userId, 'categoryItems', JSON.stringify(categoryItems));
+              }
+              
+              // 5. Update local state
+              setAllCategories(prev => [...prev, trimmedName]);
+              setEditCategory(trimmedName);
+              setIsCategoryPickerVisible(false);
+              
+            } catch (error) {
+              console.error('Failed to add new category:', error);
+              Alert.alert("Error", "Failed to save the new category.");
+            }
+          }
+        }
+      ],
+      "plain-text"
+    );
+  };
+
   const handleConfirmReceipt = async () => {
     try {
       const amount = parseFloat(editAmount);
@@ -580,6 +646,16 @@ const ChatTab = ({ currencySymbol = '$' }) => {
                         {editCategory === cat && <Text style={[styles.checkIcon, { color: theme.trim }]}>✓</Text>}
                       </TouchableOpacity>
                     ))}
+                    
+                    {/* Add New Category Option */}
+                    <TouchableOpacity
+                      style={[styles.pickerItem, { borderBottomWidth: 0, marginTop: 4, backgroundColor: `${theme.trim}0D` }]}
+                      onPress={handleAddNewCategory}
+                    >
+                      <Text style={[styles.pickerItemText, { color: theme.trim, fontWeight: 'bold' }]}>
+                        + Add Category
+                      </Text>
+                    </TouchableOpacity>
                   </ScrollView>
                 </View>
               )}
