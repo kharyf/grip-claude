@@ -13,7 +13,7 @@ import { parseReceiptText } from '../utils/receiptParser';
 import { BASE_CATEGORIES } from '../utils/defaults';
 import { parseAndFormatDate } from '../utils/dateFormatter';
 
-const interstitial = InterstitialAd.createForAdRequest(TestIds.INTERSTITIAL, {
+const interstitial = InterstitialAd.createForAdRequest(process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID || TestIds.INTERSTITIAL, {
   requestNonPersonalizedAdsOnly: true,
 });
 

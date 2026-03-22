@@ -26,7 +26,7 @@ export const SubscriptionProvider = ({ children }) => {
     const [lastLoggedEmail, setLastLoggedEmail] = useState(null);
     const appSyncSubRef = useRef(null);
 
-    const API_STAGE_URL = 'https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage';
+    const API_STAGE_URL = process.env.EXPO_PUBLIC_API_STAGE_URL || 'https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage';
 
     // ─── REST poll: used on login and as a fallback ───────────────────────────
     const checkStatus = async () => {

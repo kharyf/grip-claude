@@ -19,13 +19,13 @@ import LoginScreen from './components/LoginScreen';
 const amplifyConfig = {
   Auth: {
     Cognito: {
-      userPoolId: 'us-east-1_ep4c0DVRU',
-      userPoolClientId: '2rbspi5nhednfsjhp7t2h3lcei',
+      userPoolId: process.env.EXPO_PUBLIC_AMPLIFY_USER_POOL_ID || 'us-east-1_ep4c0DVRU',
+      userPoolClientId: process.env.EXPO_PUBLIC_AMPLIFY_USER_POOL_CLIENT_ID || '2rbspi5nhednfsjhp7t2h3lcei',
     }
   },
   API: {
     GraphQL: {
-      endpoint: 'https://vazdot6eijdnln5xjvfu2typge.appsync-api.us-east-1.amazonaws.com/graphql',
+      endpoint: process.env.EXPO_PUBLIC_AMPLIFY_GRAPHQL_ENDPOINT || 'https://vazdot6eijdnln5xjvfu2typge.appsync-api.us-east-1.amazonaws.com/graphql',
       region: 'us-east-1',
       defaultAuthMode: 'userPool', // Uses Cognito ID token automatically
     }
@@ -42,7 +42,7 @@ try {
 }
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gripahserver-98886831409.us-west1.run.app';
-const FALLBACK_STRIPE_PUBLISHABLE_KEY = "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
+const FALLBACK_STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
 
 
 const CURRENCY_SYMBOLS = {
@@ -400,7 +400,7 @@ function AppContent() {
       {status !== 'active' && (
         <View style={[styles.adContainer, { backgroundColor: theme.main, borderTopColor: theme.trim }]}>
           <BannerAd
-            unitId={TestIds.BANNER}
+            unitId={process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID || TestIds.BANNER}
             size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
             requestOptions={{
               requestNonPersonalizedAdsOnly: true,

@@ -337,9 +337,9 @@ app.get('/subscription-status', checkJwt, async (req, res) => {
 // Initialize and start server
 async function init() {
     try {
-        const isProd = process.env.NODE_ENV === 'production';
-        const secKeyName = isProd ? 'StripeSecLiveKey' : 'StripeSecTestKey';
-        const pubKeyName = isProd ? 'StripePubLiveKey' : 'StripePubTestKey';
+        const serverEnv = process.env.SERVER_ENV || 'preview'; // 'preview' or 'production'
+        const secKeyName = process.env.STRIPE_SECRET_KEY_NAME || (serverEnv === 'production' ? 'StripeSecLiveKey' : 'StripeSecTestKey');
+        const pubKeyName = process.env.STRIPE_PUB_KEY_NAME || (serverEnv === 'production' ? 'StripePubLiveKey' : 'StripePubTestKey');
 
         const stripeSecretKey = await getSecret(secKeyName) || process.env.STRIPE_SECRET_KEY;
         publishableKey = await getSecret(pubKeyName) || process.env.STRIPE_PUBLISHABLE_KEY;
