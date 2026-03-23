@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image, AppState } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image, AppState, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserItem, setUserItem } from './utils/userStorage';
@@ -400,7 +400,7 @@ function AppContent() {
       {status !== 'active' && (
         <View style={[styles.adContainer, { backgroundColor: theme.main, borderTopColor: theme.trim }]}>
           <BannerAd
-            unitId={process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID || TestIds.BANNER}
+            unitId={Platform.OS === 'ios' ? (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT_ID || TestIds.BANNER) : (process.env.EXPO_PUBLIC_ADMOB_ANDROID_BANNER_UNIT_ID || TestIds.BANNER)}
             size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
             requestOptions={{
               requestNonPersonalizedAdsOnly: true,

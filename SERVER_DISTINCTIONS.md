@@ -51,8 +51,10 @@ The app uses different AdMob identifiers based on the build profile in `eas.json
 
 - **App IDs**: Configured in `app.json` and overridden by `eas.json`.
 - **Ad Unit IDs**: Controlled by the following environment variables:
-  - `EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID`
-  - `EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID`
+  - `EXPO_PUBLIC_ADMOB_ANDROID_BANNER_UNIT_ID`
+  - `EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT_ID`
+  - `EXPO_PUBLIC_ADMOB_ANDROID_INTERSTITIAL_UNIT_ID`
+  - `EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT_ID`
 
 ### Preview vs. Production
 - **Preview profile**: Uses Google's official **Test Unit IDs**.
