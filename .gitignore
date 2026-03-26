@@ -3,6 +3,7 @@
 .npm-cache/
 server/.npm-cache-local/
 server/AWSCLIV2.pkg
+/inspect-ios
 
 # dependencies
 node_modules/

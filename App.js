@@ -3,8 +3,8 @@ import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking,
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserItem, setUserItem } from './utils/userStorage';
-import mobileAds, { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import mobileAds from 'react-native-google-mobile-ads';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -107,28 +107,28 @@ function AppContent() {
 
   const checkAutopays = async () => {
     if (!user?.userId) return;
-    
+
     try {
       const lastCheck = await getUserItem(user.userId, 'lastAutopayCheckDate');
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
-      
+
       if (lastCheck === todayStr) return;
-      
+
       const autopaysStr = await getUserItem(user.userId, 'autopays');
       const annualAutopaysStr = await getUserItem(user.userId, 'annualAutopays');
-      
+
       const autopays = autopaysStr ? JSON.parse(autopaysStr) : [];
       const annualAutopays = annualAutopaysStr ? JSON.parse(annualAutopaysStr) : [];
-      
+
       if (autopays.length === 0 && annualAutopays.length === 0) {
         await setUserItem(user.userId, 'lastAutopayCheckDate', todayStr);
         return;
       }
-      
+
       const categoryItemsStr = await getUserItem(user.userId, 'categoryItems');
       let categoryItems = categoryItemsStr ? JSON.parse(categoryItemsStr) : {};
-      
+
       let startDate;
       if (!lastCheck) {
         startDate = new Date(today);
@@ -136,26 +136,26 @@ function AppContent() {
         startDate = new Date(lastCheck);
         startDate.setDate(startDate.getDate() + 1);
       }
-      
+
       let currentProcessingDate = new Date(startDate);
       currentProcessingDate.setHours(0, 0, 0, 0);
       const comparisonToday = new Date(today);
       comparisonToday.setHours(0, 0, 0, 0);
-      
+
       let modified = false;
       const monthMap = {
         'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
         'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
       };
-      
+
       while (currentProcessingDate <= comparisonToday) {
         const dayOfMonth = currentProcessingDate.getDate();
         const year = currentProcessingDate.getFullYear();
         const monthIndex = currentProcessingDate.getMonth();
         const isLastDay = new Date(year, monthIndex + 1, 0).getDate() === dayOfMonth;
-        
+
         const dateStr = currentProcessingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        
+
         // Process Monthly
         autopays.forEach(ap => {
           const shouldTrigger = (ap.day === dayOfMonth) || (ap.day > dayOfMonth && isLastDay);
@@ -192,15 +192,15 @@ function AppContent() {
             }
           }
         });
-        
+
         currentProcessingDate.setDate(currentProcessingDate.getDate() + 1);
       }
-      
+
       if (modified) {
         await setUserItem(user.userId, 'categoryItems', JSON.stringify(categoryItems));
       }
       await setUserItem(user.userId, 'lastAutopayCheckDate', todayStr);
-      
+
     } catch (e) {
       console.error('Failed to process autopays:', e);
     }
@@ -209,13 +209,13 @@ function AppContent() {
   useEffect(() => {
     if (user?.userId && isLoaded) {
       checkAutopays();
-      
+
       const subscription = AppState.addEventListener('change', nextAppState => {
         if (nextAppState === 'active') {
           checkAutopays();
         }
       });
-      
+
       return () => subscription.remove();
     }
   }, [user?.userId, isLoaded]);
@@ -454,59 +454,11 @@ function AppContent() {
 }
 
 export default function App() {
-  const [stripePubKey, setStripePubKey] = useState(null);
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-
-      try {
-        console.log(`Fetching Stripe config from server: ${API_URL}/stripe-config`);
-        const response = await fetch(`${API_URL}/stripe-config`, {
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) throw new Error('Network response was not ok');
-        const data = await response.json();
-        if (data.publishableKey) {
-          console.log('Stripe pub key loaded from server');
-          setStripePubKey(data.publishableKey);
-        } else {
-          throw new Error('No publishable key in response');
-        }
-      } catch (error) {
-        clearTimeout(timeoutId);
-        const isTimeout = error.name === 'AbortError';
-        console.warn(
-          isTimeout
-            ? 'Stripe config fetch timed out after 3s, using fallback'
-            : `Failed to fetch Stripe config from server (${error.message || 'unknown error'}), using fallback`
-        );
-        setStripePubKey(FALLBACK_STRIPE_PUBLISHABLE_KEY);
-      }
-    };
-    fetchConfig();
-  }, []);
-
-  if (!stripePubKey) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#2a2a2a', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#32CD32', fontSize: 32, fontWeight: 'bold' }}>Gripah</Text>
-        <Text style={{ color: '#32CD32', marginTop: 10 }}>Initializing...</Text>
-      </View>
-    );
-  }
-
   return (
     <AuthProvider>
       <ThemeProvider>
         <SubscriptionProvider>
-          <StripeProvider publishableKey={stripePubKey}>
-            <AppContent />
-          </StripeProvider>
+          <AppContent />
         </SubscriptionProvider>
       </ThemeProvider>
     </AuthProvider>

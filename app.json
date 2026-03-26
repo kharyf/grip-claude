@@ -75,25 +75,14 @@
           "ios": {
             "deploymentTarget": "15.5",
             "useFrameworks": "static",
-            "newArchEnabled": true,
             "podfileProperties": {
               "use_modular_headers!": true
             },
-            "buildReactNativeFromSource": true,
             "excludedArchitectures": [
               "arm64"
             ]
           },
-          "android": {
-            "newArchEnabled": true
-          }
-        }
-      ],
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.loxodonta.gripah",
-          "enableGooglePay": true
+          "android": {}
         }
       ],
       "expo-web-browser"
