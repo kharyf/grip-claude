@@ -14,6 +14,7 @@ import ChatTab from './components/ChatTab';
 import AutopayTab from './components/AutopayTab';
 import SettingsTab from './components/SettingsTab';
 import LoginScreen from './components/LoginScreen';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 // Cognito User Pool configuration - simplified for native email/password auth
 const amplifyConfig = {
@@ -455,13 +456,15 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <SubscriptionProvider>
-          <AppContent />
-        </SubscriptionProvider>
-      </ThemeProvider>
-    </AuthProvider>
+    <StripeProvider publishableKey={FALLBACK_STRIPE_PUBLISHABLE_KEY}>
+      <AuthProvider>
+        <ThemeProvider>
+          <SubscriptionProvider>
+            <AppContent />
+          </SubscriptionProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </StripeProvider>
   );
 }
 

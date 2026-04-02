@@ -165,6 +165,64 @@ app.post('/create-subscription', checkJwt, async (req, res) => {
     }
 });
 
+// Create subscription intent for in-app Stripe PaymentSheet
+app.post('/create-subscription-intent', checkJwt, async (req, res) => {
+    if (!stripe) {
+        console.error('Stripe client not initialized');
+        return res.status(503).send({ error: { message: "Stripe service is not initialized on the server. Check AWS secret configuration." } });
+    }
+    const { email, priceId } = req.body;
+    const userId = req.userId;
+
+    try {
+        // 1. Find or Create Customer
+        let customer;
+        const customers = await stripe.customers.list({ email, limit: 1 });
+        if (customers.data.length > 0) {
+            customer = customers.data[0];
+            if (!customer.metadata.cognitoId) {
+                await stripe.customers.update(customer.id, {
+                    metadata: { cognitoId: userId }
+                });
+            }
+        } else {
+            customer = await stripe.customers.create({
+                email,
+                metadata: { cognitoId: userId }
+            });
+        }
+
+        // 2. Create Ephemeral Key
+        const ephemeralKey = await stripe.ephemeralKeys.create(
+            { customer: customer.id },
+            { apiVersion: '2023-10-16' }
+        );
+
+        // 3. Create Subscription with default_incomplete
+        const subscription = await stripe.subscriptions.create({
+            customer: customer.id,
+            items: [{ price: priceId }],
+            payment_behavior: 'default_incomplete',
+            payment_settings: { save_default_payment_method: 'on_subscription' },
+            expand: ['latest_invoice.payment_intent'],
+            metadata: {
+                cognitoId: userId
+            }
+        });
+
+        res.send({
+            paymentIntent: subscription.latest_invoice.payment_intent.client_secret,
+            ephemeralKey: ephemeralKey.secret,
+            customer: customer.id,
+            publishableKey: publishableKey
+        });
+
+    } catch (error) {
+        console.error('Error creating subscription intent:', error);
+        res.status(400).send({ error: { message: error.message } });
+    }
+});
+
 // Webhook handler - Enhanced for payment confirmation
 app.post('/webhook', async (req, res) => {
     let event;
