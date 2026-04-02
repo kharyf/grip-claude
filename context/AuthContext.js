@@ -9,7 +9,8 @@ import {
     confirmSignUp,
     resetPassword,
     confirmResetPassword,
-    resendSignUpCode
+    resendSignUpCode,
+    deleteUser,
 } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 
@@ -259,6 +260,15 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
+    const deleteAccount = useCallback(async () => {
+        await deleteUser();
+        setUser(null);
+        setToken(null);
+        setError(null);
+        setNeedsConfirmation(false);
+        setPendingEmail(null);
+    }, []);
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -272,6 +282,7 @@ export const AuthProvider = ({ children }) => {
             forgotPassword,
             confirmForgotPassword,
             logout,
+            deleteAccount,
             error,
             clearError,
             needsConfirmation,

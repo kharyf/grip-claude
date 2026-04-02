@@ -27,13 +27,15 @@ const COLOR_ROLES = [
 ];
 
 const SettingsTab = ({ currency, onCurrencyChange }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const userId = user?.userId;
   const { status, subscription } = useSubscription();
   const { theme, setThemeColor, resetTheme } = useTheme();
 
   // Options
   const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Theme picker state: which role is expanded
   const [expandedColorRole, setExpandedColorRole] = useState(null);
@@ -52,6 +54,20 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
     } catch (error) {
       console.error('Failed to reset database:', error);
       Alert.alert('Error', 'Failed to reset database.');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      await AsyncStorage.clear();
+      await deleteAccount();
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+      Alert.alert('Error', 'Failed to delete account. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModalVisible(false);
     }
   };
 
@@ -195,9 +211,9 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
           ) : (
             <View style={styles.unsubscribeSection}>
               <TouchableOpacity
-                onPress={() => Linking.openURL('https://billing.stripe.com/p/login/test_8x228qdqcg3lgeQ1xA3sI00')}
+                onPress={() => Linking.openURL('itms-apps://apps.apple.com/account/subscriptions')}
               >
-                <Text style={styles.unsubscribeText}>Unsubscribe</Text>
+                <Text style={styles.unsubscribeText}>Manage Subscription</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -211,6 +227,12 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             onPress={logout}
           >
             <Text style={styles.buttonText}>Log Out</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.resetButton, { backgroundColor: '#FF3B30' }]}
+            onPress={() => setDeleteModalVisible(true)}
+          >
+            <Text style={styles.buttonText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
 
@@ -229,6 +251,41 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Delete Account Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={deleteModalVisible}
+          onRequestClose={() => setDeleteModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.resetModalContainer, { backgroundColor: theme.main }]}>
+              <Text style={styles.resetModalTitle}>Delete Account</Text>
+              <Text style={styles.resetModalText}>
+                This will permanently delete your account and all associated data. This action cannot be undone.
+              </Text>
+              <View style={styles.resetModalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setDeleteModalVisible(false)}
+                  disabled={deleteLoading}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmResetButton]}
+                  onPress={handleDeleteAccount}
+                  disabled={deleteLoading}
+                >
+                  <Text style={styles.confirmResetButtonText}>
+                    {deleteLoading ? 'Deleting…' : 'Delete'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Reset Confirmation Modal */}
         <Modal

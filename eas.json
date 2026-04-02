@@ -9,9 +9,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO",
-        "EXPO_PUBLIC_STRIPE_PRICE_ID": "price_1SsCUJAZmHfL53PCgL5Snrjc",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
         "EXPO_PUBLIC_API_URL": "https://gr-f1dda9023cb9481db8f60033be624a9b.ecs.us-east-1.on.aws",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_ep4c0DVRU",
@@ -25,9 +23,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/test_8x228qdqcg3lgeQ1xA3sI00",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO",
-        "EXPO_PUBLIC_STRIPE_PRICE_ID": "price_1SsCUJAZmHfL53PCgL5Snrjc",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
         "EXPO_PUBLIC_API_URL": "https://gripahserver-98886831409.us-west1.run.app",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_ep4c0DVRU",
@@ -48,9 +44,7 @@
       "autoIncrement": true,
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_STRIPE_PAYMENT_LINK": "https://buy.stripe.com/fZueVcdivcgC0n03962B200",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SlYj1AmY585Q2KbfE5daEeB7CMI2qlBh272ssMn75YQxCBuEqB9GVtcUi2A2pwsagUxrzA4p100IcP3OuTb5vwx00Ps7XzCAn",
-        "EXPO_PUBLIC_STRIPE_PRICE_ID": "price_1SmmdxAmY585Q2KbnCviGsdD",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
         "EXPO_PUBLIC_API_URL": "https://gripahliveserver-98886831409.us-east1.run.app",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c9wsya0ga2.execute-api.us-east-1.amazonaws.com/GripahLiveAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_2AcU6ibG2",

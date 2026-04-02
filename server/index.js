@@ -210,8 +210,16 @@ app.post('/create-subscription-intent', checkJwt, async (req, res) => {
             }
         });
 
+        console.log('latest_invoice:', JSON.stringify(subscription.latest_invoice, null, 2));
+
+        const paymentIntent = subscription.latest_invoice?.payment_intent;
+
+        if (!paymentIntent) {
+            return res.status(400).send({ error: { message: 'No payment intent found on subscription' } });
+        }
+
         res.send({
-            paymentIntent: subscription.latest_invoice.payment_intent.client_secret,
+            paymentIntent: paymentIntent.client_secret,
             ephemeralKey: ephemeralKey.secret,
             customer: customer.id,
             publishableKey: publishableKey
@@ -220,6 +228,54 @@ app.post('/create-subscription-intent', checkJwt, async (req, res) => {
     } catch (error) {
         console.error('Error creating subscription intent:', error);
         res.status(400).send({ error: { message: error.message } });
+    }
+});
+
+// Apple IAP receipt verification
+app.post('/verify-apple-iap', checkJwt, async (req, res) => {
+    try {
+        const { receiptData, cognitoId } = req.body;
+
+        if (!receiptData || !cognitoId) {
+            return res.status(400).json({ error: { message: 'receiptData and cognitoId are required' } });
+        }
+
+        const sharedSecret = await getSecret('AppleIAPSharedSecret').catch(() => null)
+            || process.env.APPLE_IAP_SHARED_SECRET;
+
+        const verifyWithApple = async (url) => {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'receipt-data': receiptData, password: sharedSecret }),
+            });
+            return response.json();
+        };
+
+        // Try production first; if Apple returns 21007 the receipt is a sandbox receipt
+        let appleResponse = await verifyWithApple('https://buy.itunes.apple.com/verifyReceipt');
+        if (appleResponse.status === 21007) {
+            appleResponse = await verifyWithApple('https://sandbox.itunes.apple.com/verifyReceipt');
+        }
+
+        if (appleResponse.status !== 0) {
+            return res.status(400).json({ error: { message: `Apple verification failed with status ${appleResponse.status}` } });
+        }
+
+        const latestReceipts = appleResponse.latest_receipt_info || [];
+        const now = Date.now();
+        const activeSubscription = latestReceipts.find(r => parseInt(r.expires_date_ms) > now);
+
+        if (!activeSubscription) {
+            return res.status(400).json({ error: { message: 'No active subscription found in receipt' } });
+        }
+
+        console.log(`Apple IAP verified for user ${cognitoId}, product: ${activeSubscription.product_id}, expires: ${activeSubscription.expires_date}`);
+
+        res.json({ success: true, expiresDate: activeSubscription.expires_date });
+    } catch (error) {
+        console.error('Apple IAP verification error:', error);
+        res.status(500).json({ error: { message: error.message } });
     }
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Linking, Alert, Image, AppState, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Modal, Image, AppState, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserItem, setUserItem } from './utils/userStorage';
@@ -14,7 +14,6 @@ import ChatTab from './components/ChatTab';
 import AutopayTab from './components/AutopayTab';
 import SettingsTab from './components/SettingsTab';
 import LoginScreen from './components/LoginScreen';
-import { StripeProvider } from '@stripe/stripe-react-native';
 
 // Cognito User Pool configuration - simplified for native email/password auth
 const amplifyConfig = {
@@ -43,8 +42,6 @@ try {
 }
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gripahserver-98886831409.us-west1.run.app';
-const FALLBACK_STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51SlYj7AZmHfL53PCbuuW0PLizUDYeKeQ3Sc1yUidPMut2S9Tjof4ZfuRwAsihbfDDT2GOcUmyZUwYGvEFJCqU3O900rR2Dp5uO";
-
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -254,53 +251,6 @@ function AppContent() {
     }
   };
 
-  useEffect(() => {
-    const handleDeepLink = async ({ url }) => {
-      console.log('Deep link received:', url);
-      if (url) {
-        try {
-          const urlObj = new URL(url);
-          const sessionId = urlObj.searchParams.get('session_id');
-
-          if (url.includes('payment-success')) {
-            console.log('Payment success detected', sessionId ? `Session: ${sessionId}` : '');
-            // Wait a moment for webhook to process
-            setTimeout(async () => {
-              await checkStatus();
-              Alert.alert(
-                "Subscription Successful",
-                "Thank you for subscribing! Your premium features are now active.",
-                [{ text: "OK", onPress: () => setActiveTab('Settings') }]
-              );
-            }, 2000);
-          } else if (url.includes('payment-cancel')) {
-            const cancelReason = urlObj.searchParams.get('reason') || 'The subscription process was cancelled.';
-            Alert.alert("Subscription Cancelled", cancelReason);
-          } else if (sessionId) {
-            // Handle any Stripe checkout session return
-            console.log('Stripe session detected:', sessionId);
-            setTimeout(() => checkStatus(), 1500);
-          }
-        } catch (error) {
-          console.error('Error processing deep link:', error);
-        }
-      }
-    };
-
-    // Check for initial URL (cold start)
-    Linking.getInitialURL().then((url) => {
-      if (url) handleDeepLink({ url });
-    }).catch(error => {
-      console.error('Error getting initial URL:', error);
-    });
-
-    // Add listener (warm start)
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   const userEmail = user?.attributes?.email || user?.username || '';
   const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : '👤';
@@ -456,15 +406,13 @@ function AppContent() {
 
 export default function App() {
   return (
-    <StripeProvider publishableKey={FALLBACK_STRIPE_PUBLISHABLE_KEY}>
-      <AuthProvider>
-        <ThemeProvider>
-          <SubscriptionProvider>
-            <AppContent />
-          </SubscriptionProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    </StripeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <SubscriptionProvider>
+          <AppContent />
+        </SubscriptionProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
