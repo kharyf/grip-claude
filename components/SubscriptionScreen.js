@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import * as RNIap from 'react-native-iap';
 
-const IAP_PRODUCT_ID = process.env.EXPO_PUBLIC_IAP_PRODUCT_ID || 'com.loxodonta.gripah.premium.monthly';
+const IOS_PRODUCT_ID = process.env.EXPO_PUBLIC_IAP_PRODUCT_ID || 'com.loxodonta.gripah.premium.monthly';
+const ANDROID_PRODUCT_ID = process.env.EXPO_PUBLIC_ANDROID_IAP_PRODUCT_ID || IOS_PRODUCT_ID;
+const PRODUCT_ID = Platform.OS === 'android' ? ANDROID_PRODUCT_ID : IOS_PRODUCT_ID;
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://gripahserver-98886831409.us-west1.run.app';
+const ANDROID_PACKAGE_NAME = 'com.loxodonta.gripah';
 
 const SubscriptionScreen = () => {
     const { user, token } = useAuth();
     const { checkStatus } = useSubscription();
     const [loading, setLoading] = useState(false);
     const [product, setProduct] = useState(null);
+    const [productError, setProductError] = useState(false);
 
     useEffect(() => {
         let purchaseUpdateSub;
@@ -21,19 +25,28 @@ const SubscriptionScreen = () => {
             try {
                 await RNIap.initConnection();
 
-                const subs = await RNIap.getSubscriptions({ skus: [IAP_PRODUCT_ID] });
-                if (subs.length > 0) setProduct(subs[0]);
+                const subs = await RNIap.getSubscriptions({ skus: [PRODUCT_ID] });
+                if (subs.length > 0) {
+                    setProduct(subs[0]);
+                } else {
+                    console.warn('IAP: No subscriptions returned for SKU:', PRODUCT_ID);
+                    setProductError(true);
+                }
 
                 purchaseUpdateSub = RNIap.purchaseUpdatedListener(async (purchase) => {
-                    const receipt = purchase.transactionReceipt;
-                    if (!receipt) return;
+                    // iOS uses transactionReceipt; Android uses purchaseToken
+                    const receiptOrToken = Platform.OS === 'android'
+                        ? purchase.purchaseToken
+                        : purchase.transactionReceipt;
+
+                    if (!receiptOrToken) return;
                     try {
-                        await verifyReceipt(receipt);
+                        await verifyPurchase(receiptOrToken, purchase);
                         await RNIap.finishTransaction({ purchase, isConsumable: false });
                         await checkStatus();
                         Alert.alert('Success', 'Your subscription is now active!');
                     } catch (err) {
-                        console.error('Receipt verification failed:', err);
+                        console.error('Purchase verification failed:', err);
                         Alert.alert('Error', 'Could not verify your purchase. Please contact support.');
                     } finally {
                         setLoading(false);
@@ -60,29 +73,53 @@ const SubscriptionScreen = () => {
         };
     }, []);
 
-    const verifyReceipt = async (receiptData) => {
-        const response = await fetch(`${API_URL}/verify-apple-iap`, {
+    const verifyPurchase = async (receiptOrToken, purchase) => {
+        const isAndroid = Platform.OS === 'android';
+        const endpoint = isAndroid ? '/verify-google-iap' : '/verify-apple-iap';
+        const body = isAndroid
+            ? {
+                purchaseToken: receiptOrToken,
+                productId: purchase.productId,
+                packageName: ANDROID_PACKAGE_NAME,
+                cognitoId: user?.userId,
+              }
+            : {
+                receiptData: receiptOrToken,
+                cognitoId: user?.userId,
+              };
+
+        const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
             },
-            body: JSON.stringify({
-                receiptData,
-                cognitoId: user?.userId,
-            }),
+            body: JSON.stringify(body),
         });
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.error?.message || 'Receipt verification failed');
+            throw new Error(err.error?.message || 'Purchase verification failed');
         }
         return response.json();
     };
 
     const subscribe = async () => {
+        if (!product) {
+            Alert.alert('Unavailable', 'Subscription product could not be loaded. Please try again later.');
+            return;
+        }
         setLoading(true);
         try {
-            await RNIap.requestSubscription({ sku: IAP_PRODUCT_ID });
+            if (Platform.OS === 'android') {
+                // Google Play Billing v5+ requires subscriptionOffers with offerToken
+                const offerToken = product?.subscriptionOfferDetails?.[0]?.offerToken;
+                const params = offerToken
+                    ? { sku: PRODUCT_ID, subscriptionOffers: [{ sku: PRODUCT_ID, offerToken }] }
+                    : { sku: PRODUCT_ID };
+                await RNIap.requestSubscription(params);
+            } else {
+                await RNIap.requestSubscription({ sku: PRODUCT_ID });
+            }
             // Completion handled by purchaseUpdatedListener
         } catch (err) {
             if (err.code !== 'E_USER_CANCELLED') {
@@ -92,18 +129,27 @@ const SubscriptionScreen = () => {
         }
     };
 
-    const priceDisplay = product?.localizedPrice || '$2.99';
+    const getPriceDisplay = () => {
+        if (!product) return '$2.99';
+        if (Platform.OS === 'android') {
+            // Android v5 pricing is inside subscriptionOfferDetails
+            const formattedPrice = product.subscriptionOfferDetails?.[0]
+                ?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice;
+            return formattedPrice || product.localizedPrice || '$2.99';
+        }
+        return product.localizedPrice || '$2.99';
+    };
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Gripah Premium</Text>
             <Text style={styles.description}>Enjoy an ad-free experience and support the development of Gripah.</Text>
-            <Text style={styles.price}>{priceDisplay} / month</Text>
+            <Text style={styles.price}>{getPriceDisplay()} / month</Text>
 
             <TouchableOpacity
                 style={styles.subscribeButton}
                 onPress={subscribe}
-                disabled={loading}
+                disabled={loading || productError}
             >
                 {loading ? (
                     <ActivityIndicator color="#1a1a1a" />

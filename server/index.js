@@ -279,6 +279,60 @@ app.post('/verify-apple-iap', checkJwt, async (req, res) => {
     }
 });
 
+// Google Play IAP purchase verification
+app.post('/verify-google-iap', checkJwt, async (req, res) => {
+    try {
+        const { purchaseToken, productId, packageName, cognitoId } = req.body;
+
+        if (!purchaseToken || !productId || !packageName || !cognitoId) {
+            return res.status(400).json({ error: { message: 'purchaseToken, productId, packageName, and cognitoId are required' } });
+        }
+
+        const serviceAccountJson = await getSecret('GooglePlayServiceAccount').catch(() => null)
+            || process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+
+        if (!serviceAccountJson) {
+            return res.status(500).json({ error: { message: 'Google Play credentials not configured' } });
+        }
+
+        const serviceAccount = typeof serviceAccountJson === 'string'
+            ? JSON.parse(serviceAccountJson)
+            : serviceAccountJson;
+
+        const { google } = require('googleapis');
+        const auth = new google.auth.GoogleAuth({
+            credentials: serviceAccount,
+            scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+        });
+
+        const androidPublisher = google.androidpublisher({ version: 'v3', auth });
+        const response = await androidPublisher.purchases.subscriptions.get({
+            packageName,
+            subscriptionId: productId,
+            token: purchaseToken,
+        });
+
+        const purchase = response.data;
+        const expiryTimeMs = parseInt(purchase.expiryTimeMillis);
+
+        if (expiryTimeMs < Date.now()) {
+            return res.status(400).json({ error: { message: 'Subscription has expired' } });
+        }
+
+        // paymentState: 1 = payment received, 2 = free trial
+        if (purchase.paymentState !== 1 && purchase.paymentState !== 2) {
+            return res.status(400).json({ error: { message: 'Payment not completed' } });
+        }
+
+        console.log(`Google Play IAP verified for user ${cognitoId}, product: ${productId}, expires: ${new Date(expiryTimeMs).toISOString()}`);
+
+        res.json({ success: true, expiresDate: new Date(expiryTimeMs).toISOString() });
+    } catch (error) {
+        console.error('Google Play IAP verification error:', error);
+        res.status(500).json({ error: { message: error.message } });
+    }
+});
+
 // Webhook handler - Enhanced for payment confirmation
 app.post('/webhook', async (req, res) => {
     let event;

@@ -10,12 +10,18 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "overrides": {
+    "fast-xml-parser": "^5.5.10",
+    "path-to-regexp": "^8.4.2",
+    "qs": "^6.15.0"
+  },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.972.0",
     "aws-jwt-verify": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "googleapis": "^144.0.0",
     "stripe": "^20.1.0"
   }
 }

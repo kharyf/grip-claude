@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, Alert, Linking } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, Alert, Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setUserItem, removeUserItem } from '../utils/userStorage';
 import { Picker } from '@react-native-picker/picker';
@@ -211,7 +211,12 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
           ) : (
             <View style={styles.unsubscribeSection}>
               <TouchableOpacity
-                onPress={() => Linking.openURL('itms-apps://apps.apple.com/account/subscriptions')}
+                onPress={() => {
+                  const url = Platform.OS === 'android'
+                    ? 'https://play.google.com/store/account/subscriptions'
+                    : 'itms-apps://apps.apple.com/account/subscriptions';
+                  Linking.openURL(url);
+                }}
               >
                 <Text style={styles.unsubscribeText}>Manage Subscription</Text>
               </TouchableOpacity>
