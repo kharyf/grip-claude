@@ -1,20 +1,85 @@
-require('dotenv').config();
+const envFile = process.env.SERVER_ENV ? `.env.${process.env.SERVER_ENV}` : '.env';
+require('dotenv').config({ path: envFile });
 const express = require('express');
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBDocumentClient, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { STSClient, AssumeRoleWithWebIdentityCommand } = require("@aws-sdk/client-sts");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
 const cors = require('cors');
 
-let stripe;
-let publishableKey;
 const app = express();
 
-// AWS Secrets Manager setup
-const secretsClient = new SecretsManagerClient({
-    region: process.env.AWS_REGION || "us-east-1",
-});
+const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const DYNAMODB_TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || "GripahTestUsersTable";
 
 // API Gateway configuration
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage";
+
+// ── Cross-cloud credential provider (GCP Workload Identity → AWS STS) ─────────
+// Fetches an OIDC token from the GCP metadata server (only available inside Cloud Run/GCE).
+async function fetchGcpOidcToken(audience) {
+    const url = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`;
+    const response = await fetch(url, { headers: { 'Metadata-Flavor': 'Google' } });
+    if (!response.ok) throw new Error(`GCP metadata server returned ${response.status}`);
+    return response.text();
+}
+
+let cachedCredentials = null;
+let credentialExpiry = 0;
+
+// Returns temporary AWS credentials by exchanging the GCP OIDC token with STS.
+// Caches credentials and refreshes them 5 minutes before expiry.
+// If AWS_ROLE_ARN is not set (local dev), returns undefined so the SDK uses ~/.aws.
+async function getAwsCredentials() {
+    const roleArn = process.env.AWS_ROLE_ARN;
+    const audience = process.env.GCP_TOKEN_AUDIENCE || 'gripah-aws-access';
+
+    if (!roleArn) return undefined;
+
+    if (cachedCredentials && Date.now() < credentialExpiry - 5 * 60 * 1000) {
+        return cachedCredentials;
+    }
+
+    try {
+        const webIdentityToken = await fetchGcpOidcToken(audience);
+        const stsClient = new STSClient({ region: AWS_REGION });
+        const { Credentials } = await stsClient.send(new AssumeRoleWithWebIdentityCommand({
+            RoleArn: roleArn,
+            RoleSessionName: 'GripahCloudRunSession',
+            WebIdentityToken: webIdentityToken,
+            DurationSeconds: 3600,
+        }));
+
+        cachedCredentials = {
+            accessKeyId: Credentials.AccessKeyId,
+            secretAccessKey: Credentials.SecretAccessKey,
+            sessionToken: Credentials.SessionToken,
+        };
+        credentialExpiry = Credentials.Expiration.getTime();
+        console.log(`[AWS] Assumed role ${roleArn}, credentials valid until ${Credentials.Expiration}`);
+        return cachedCredentials;
+    } catch (err) {
+        console.error('[AWS] STS credential exchange failed, falling back to env vars:', err.message);
+        return undefined;
+    }
+}
+
+// SDK clients — initialized in init() after credentials are fetched
+let secretsClient;
+let dynamo;
+
+async function initAwsClients() {
+    const credentials = await getAwsCredentials();
+    const config = { region: AWS_REGION, ...(credentials && { credentials }) };
+
+    secretsClient = new SecretsManagerClient(config);
+
+    const dynamoClient = new DynamoDBClient(config);
+    dynamo = DynamoDBDocumentClient.from(dynamoClient);
+    console.log('[AWS] SDK clients initialized');
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function getSecret(secretName) {
     console.log(`Fetching AWS secret: ${secretName}`);
@@ -95,141 +160,6 @@ app.get('/health', (req, res) => {
     res.status(200).send({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Endpoint for frontend to get Stripe configuration
-app.get('/stripe-config', (req, res) => {
-    if (!publishableKey) {
-        return res.status(503).send({ error: "Stripe configuration not yet available" });
-    }
-    res.send({ publishableKey });
-});
-
-// Create Stripe Checkout Session (for Subscriptions)
-app.post('/create-subscription', checkJwt, async (req, res) => {
-    if (!stripe) {
-        console.error('Stripe client not initialized');
-        return res.status(503).send({ error: { message: "Stripe service is not initialized on the server. Check AWS secret configuration." } });
-    }
-    const { email, priceId } = req.body;
-
-    const userId = req.userId;
-
-    try {
-        // 1. Find or Create Customer
-        let customer;
-        const customers = await stripe.customers.list({ email, limit: 1 });
-        if (customers.data.length > 0) {
-            customer = customers.data[0];
-            // Update metadata if it doesn't have cognitoId
-            if (!customer.metadata.cognitoId) {
-                await stripe.customers.update(customer.id, {
-                    metadata: { cognitoId: userId }
-                });
-            }
-        } else {
-            customer = await stripe.customers.create({
-                email,
-                metadata: { cognitoId: userId }
-            });
-        }
-
-        // 2. Create Checkout Session
-        const session = await stripe.checkout.sessions.create({
-            customer: customer.id,
-            line_items: [
-                {
-                    price: priceId,
-                    quantity: 1,
-                },
-            ],
-            mode: 'subscription',
-            success_url: 'gripah://payment-success?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url: 'gripah://payment-cancel?reason=Payment+cancelled',
-            metadata: {
-                cognitoId: userId
-            },
-            allow_promotion_codes: true,
-            billing_address_collection: 'auto',
-            customer_update: {
-                address: 'auto',
-                name: 'auto',
-            },
-        });
-
-        res.send({
-            url: session.url
-        });
-
-    } catch (error) {
-        console.error('Error creating subscription:', error);
-        res.status(400).send({ error: { message: error.message } });
-    }
-});
-
-// Create subscription intent for in-app Stripe PaymentSheet
-app.post('/create-subscription-intent', checkJwt, async (req, res) => {
-    if (!stripe) {
-        console.error('Stripe client not initialized');
-        return res.status(503).send({ error: { message: "Stripe service is not initialized on the server. Check AWS secret configuration." } });
-    }
-    const { email, priceId } = req.body;
-    const userId = req.userId;
-
-    try {
-        // 1. Find or Create Customer
-        let customer;
-        const customers = await stripe.customers.list({ email, limit: 1 });
-        if (customers.data.length > 0) {
-            customer = customers.data[0];
-            if (!customer.metadata.cognitoId) {
-                await stripe.customers.update(customer.id, {
-                    metadata: { cognitoId: userId }
-                });
-            }
-        } else {
-            customer = await stripe.customers.create({
-                email,
-                metadata: { cognitoId: userId }
-            });
-        }
-
-        // 2. Create Ephemeral Key
-        const ephemeralKey = await stripe.ephemeralKeys.create(
-            { customer: customer.id },
-            { apiVersion: '2023-10-16' }
-        );
-
-        // 3. Create Subscription with default_incomplete
-        const subscription = await stripe.subscriptions.create({
-            customer: customer.id,
-            items: [{ price: priceId }],
-            payment_behavior: 'default_incomplete',
-            payment_settings: { save_default_payment_method: 'on_subscription' },
-            expand: ['latest_invoice.payment_intent'],
-            metadata: {
-                cognitoId: userId
-            }
-        });
-
-        console.log('latest_invoice:', JSON.stringify(subscription.latest_invoice, null, 2));
-
-        const paymentIntent = subscription.latest_invoice?.payment_intent;
-
-        if (!paymentIntent) {
-            return res.status(400).send({ error: { message: 'No payment intent found on subscription' } });
-        }
-
-        res.send({
-            paymentIntent: paymentIntent.client_secret,
-            ephemeralKey: ephemeralKey.secret,
-            customer: customer.id,
-            publishableKey: publishableKey
-        });
-
-    } catch (error) {
-        console.error('Error creating subscription intent:', error);
-        res.status(400).send({ error: { message: error.message } });
-    }
-});
 
 // Apple IAP receipt verification
 app.post('/verify-apple-iap', checkJwt, async (req, res) => {
@@ -263,14 +193,35 @@ app.post('/verify-apple-iap', checkJwt, async (req, res) => {
         }
 
         const latestReceipts = appleResponse.latest_receipt_info || [];
+        const inAppReceipts = appleResponse.receipt?.in_app || [];
         const now = Date.now();
-        const activeSubscription = latestReceipts.find(r => parseInt(r.expires_date_ms) > now);
+
+        // latest_receipt_info is empty on a first-ever sandbox purchase; fall back to receipt.in_app
+        const activeSubscription =
+            latestReceipts.find(r => parseInt(r.expires_date_ms) > now) ||
+            inAppReceipts.find(r => parseInt(r.expires_date_ms) > now) ||
+            inAppReceipts[inAppReceipts.length - 1]; // last entry = most recent purchase
 
         if (!activeSubscription) {
             return res.status(400).json({ error: { message: 'No active subscription found in receipt' } });
         }
 
         console.log(`Apple IAP verified for user ${cognitoId}, product: ${activeSubscription.product_id}, expires: ${activeSubscription.expires_date}`);
+
+        // expires_date_ms may be absent on a fresh in_app entry; fall forward 30 days as a safe default
+        const expiresMs = parseInt(activeSubscription.expires_date_ms) || (now + 30 * 24 * 60 * 60 * 1000);
+        const premiumUntil = new Date(expiresMs).toISOString();
+        await dynamo.send(new UpdateCommand({
+            TableName: DYNAMODB_TABLE_NAME,
+            Key: { cognitoUsername: cognitoId, email: req.user.email },
+            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until',
+            ExpressionAttributeValues: {
+                ':premium': true,
+                ':status': 'active',
+                ':until': premiumUntil,
+            },
+        }));
+        console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
 
         res.json({ success: true, expiresDate: activeSubscription.expires_date });
     } catch (error) {
@@ -324,88 +275,28 @@ app.post('/verify-google-iap', checkJwt, async (req, res) => {
             return res.status(400).json({ error: { message: 'Payment not completed' } });
         }
 
-        console.log(`Google Play IAP verified for user ${cognitoId}, product: ${productId}, expires: ${new Date(expiryTimeMs).toISOString()}`);
+        const premiumUntil = new Date(expiryTimeMs).toISOString();
+        console.log(`Google Play IAP verified for user ${cognitoId}, product: ${productId}, expires: ${premiumUntil}`);
 
-        res.json({ success: true, expiresDate: new Date(expiryTimeMs).toISOString() });
+        await dynamo.send(new UpdateCommand({
+            TableName: DYNAMODB_TABLE_NAME,
+            Key: { cognitoUsername: cognitoId, email: req.user.email },
+            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until',
+            ExpressionAttributeValues: {
+                ':premium': true,
+                ':status': 'active',
+                ':until': premiumUntil,
+            },
+        }));
+        console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
+
+        res.json({ success: true, expiresDate: premiumUntil });
     } catch (error) {
         console.error('Google Play IAP verification error:', error);
         res.status(500).json({ error: { message: error.message } });
     }
 });
 
-// Webhook handler - Enhanced for payment confirmation
-app.post('/webhook', async (req, res) => {
-    let event;
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    try {
-        // Try Stripe signature verification first if webhook secret is available
-        if (webhookSecret && sig) {
-            const stripe = require('stripe')(await getSecret('StripeSecTestKey') || process.env.STRIPE_SECRET_KEY);
-            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-        } else {
-            // Fallback to EventBridge format or direct body
-            event = req.body.detail || req.body;
-
-            if (!event || !event.type) {
-                throw new Error('Invalid webhook payload: missing event type');
-            }
-        }
-    } catch (err) {
-        console.error(`Webhook signature verification failed: ${err.message}`);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    switch (event.type) {
-        case 'checkout.session.completed':
-            const session = event.data.object;
-            const cognitoId = session.metadata?.cognitoId;
-            console.log(`Checkout completed for customer: ${session.customer}, cognitoId: ${cognitoId}`);
-
-            // Store subscription completion for later retrieval
-            if (cognitoId) {
-                console.log(`Payment successful for user ${cognitoId}, session ${session.id}`);
-            }
-            break;
-
-        case 'invoice.paid':
-            const invoice = event.data.object;
-            console.log(`Invoice ${invoice.id} paid. Extending Pro access for ${invoice.customer}.`);
-            break;
-
-        case 'invoice.payment_failed':
-            const failedInvoice = event.data.object;
-            console.log(`Payment failed for ${failedInvoice.customer}. revoking/warning Pro status.`);
-            break;
-
-        case 'customer.subscription.created':
-            const subCreated = event.data.object;
-            console.log(`Subscription ${subCreated.id} created. Status: ${subCreated.status}`);
-            break;
-
-        case 'customer.subscription.updated':
-            const subUpdated = event.data.object;
-            console.log(`Subscription ${subUpdated.id} updated. Status: ${subUpdated.status}`);
-
-            // Update subscription status in the customer metadata if needed
-            if (subUpdated.metadata?.cognitoId) {
-                console.log(`Subscription updated for user ${subUpdated.metadata.cognitoId}`);
-            }
-            break;
-
-        case 'customer.subscription.deleted':
-            const subDeleted = event.data.object;
-            console.log(`Subscription ${subDeleted.id} deleted.`);
-            break;
-
-        default:
-            console.log(`Unhandled event type ${event.type}`);
-    }
-
-    res.json({ received: true });
-});
 
 // Premium user endpoint (API Gateway + Lambda based)
 app.get('/premium-user', checkJwt, async (req, res) => {
@@ -464,66 +355,26 @@ app.get('/premium-user', checkJwt, async (req, res) => {
     }
 });
 
-// Subscription status endpoint
-app.get('/subscription-status', checkJwt, async (req, res) => {
-    const userId = req.userId;
 
-    try {
-        // Search by cognitoId metadata
-        const customers = await stripe.customers.search({
-            query: `metadata['cognitoId']:'${userId}'`,
-        });
-
-        if (customers.data.length === 0) {
-            return res.send({ status: 'none' });
-        }
-
-        const customer = customers.data[0];
-        const subscriptions = await stripe.subscriptions.list({
-            customer: customer.id,
-            status: 'all',
-            limit: 1,
-        });
-
-        if (subscriptions.data.length > 0) {
-            const subscription = subscriptions.data[0];
-            const isPro = ['active', 'trialing'].includes(subscription.status);
-            res.send({
-                status: isPro ? 'active' : 'none',
-                stripeStatus: subscription.status,
-                subscriptionId: subscription.id
-            });
-        } else {
-            res.send({ status: 'none' });
-        }
-    } catch (error) {
-        console.error('Error fetching subscription status:', error);
-        res.status(500).send({ error: 'Internal Server Error' });
+// JSON error handler — catches express-jwt UnauthorizedError and any unhandled Express errors
+// Must be defined with 4 args so Express treats it as an error-handling middleware
+app.use((err, req, res, next) => {
+    if (err.name === 'UnauthorizedError') {
+        return res.status(401).json({ error: { message: 'Invalid or expired token' } });
     }
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: { message: err.message || 'Internal server error' } });
 });
 
 // Initialize and start server
 async function init() {
     try {
-        const serverEnv = process.env.SERVER_ENV || 'preview'; // 'preview' or 'production'
-        const secKeyName = process.env.STRIPE_SECRET_KEY_NAME || (serverEnv === 'production' ? 'StripeSecLiveKey' : 'StripeSecTestKey');
-        const pubKeyName = process.env.STRIPE_PUB_KEY_NAME || (serverEnv === 'production' ? 'StripePubLiveKey' : 'StripePubTestKey');
-
-        const stripeSecretKey = await getSecret(secKeyName) || process.env.STRIPE_SECRET_KEY;
-        publishableKey = await getSecret(pubKeyName) || process.env.STRIPE_PUBLISHABLE_KEY;
-
-        if (!stripeSecretKey) {
-            throw new Error(`Stripe secret key not found. Tried secret: ${secKeyName} and env: STRIPE_SECRET_KEY`);
-        }
-
-        stripe = require('stripe')(stripeSecretKey);
+        await initAwsClients();
 
         const PORT = process.env.PORT || 3000;
         const server = app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`Stripe Secret Key loaded from: ${stripeSecretKey === process.env.STRIPE_SECRET_KEY ? 'Environment' : 'AWS'}`);
-            console.log(`Stripe Pub Key loaded from: ${publishableKey === process.env.STRIPE_PUBLISHABLE_KEY ? 'Environment' : 'AWS'}`);
         });
 
         // Graceful shutdown handling for Fargate

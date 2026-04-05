@@ -45,6 +45,9 @@
     "styleq": "^0.2.1",
     "use-deep-compare-effect": "^1.8.1"
   },
+  "devDependencies": {
+    "patch-package": "^8.0.0"
+  },
   "private": true,
   "expo": {
     "doctor": {

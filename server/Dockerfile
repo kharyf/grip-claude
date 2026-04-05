@@ -13,6 +13,7 @@ COPY . .
 
 # Expose the port (defaulting to 80 for Fargate health checks)
 ENV PORT=80
+ENV SERVER_ENV=production
 EXPOSE 80
 
 # Start the server (runs as root to bind to port 80)

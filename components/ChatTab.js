@@ -76,8 +76,10 @@ const ChatTab = ({ currencySymbol = '$' }) => {
       }
     });
 
-    // Start loading the first ad
-    interstitial.load();
+    // Start loading the first ad (skipped for premium users)
+    if (status !== 'active') {
+      interstitial.load();
+    }
 
     return () => {
       unsubscribeLoaded();
@@ -217,6 +219,10 @@ const ChatTab = ({ currencySymbol = '$' }) => {
   };
 
   const handleCameraPress = async () => {
+    if (status === 'active') {
+      showScanOptions();
+      return;
+    }
     if (adLoaded) {
       pendingScanRef.current = true;
       try {
