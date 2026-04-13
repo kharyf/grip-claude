@@ -3,7 +3,7 @@ require('dotenv').config({ path: envFile });
 const express = require('express');
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, UpdateCommand, GetCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
 const { STSClient, AssumeRoleWithWebIdentityCommand } = require("@aws-sdk/client-sts");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
 const cors = require('cors');
@@ -80,6 +80,16 @@ async function initAwsClients() {
     console.log('[AWS] SDK clients initialized');
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
+async function downgradeUser(cognitoUsername, email, reason) {
+    await dynamo.send(new UpdateCommand({
+        TableName: DYNAMODB_TABLE_NAME,
+        Key: { cognitoUsername, email },
+        UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status',
+        ExpressionAttributeValues: { ':premium': false, ':status': reason },
+    }));
+    console.log(`DynamoDB: user ${cognitoUsername} downgraded (reason: ${reason})`);
+}
 
 async function getSecret(secretName) {
     console.log(`Fetching AWS secret: ${secretName}`);
@@ -214,11 +224,12 @@ app.post('/verify-apple-iap', checkJwt, async (req, res) => {
         await dynamo.send(new UpdateCommand({
             TableName: DYNAMODB_TABLE_NAME,
             Key: { cognitoUsername: cognitoId, email: req.user.email },
-            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until',
+            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until, appleOriginalTransactionId = :txId',
             ExpressionAttributeValues: {
                 ':premium': true,
                 ':status': 'active',
                 ':until': premiumUntil,
+                ':txId': activeSubscription.original_transaction_id || '',
             },
         }));
         console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
@@ -281,11 +292,12 @@ app.post('/verify-google-iap', checkJwt, async (req, res) => {
         await dynamo.send(new UpdateCommand({
             TableName: DYNAMODB_TABLE_NAME,
             Key: { cognitoUsername: cognitoId, email: req.user.email },
-            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until',
+            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until, googlePurchaseToken = :token',
             ExpressionAttributeValues: {
                 ':premium': true,
                 ':status': 'active',
                 ':until': premiumUntil,
+                ':token': purchaseToken,
             },
         }));
         console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
@@ -344,6 +356,20 @@ app.get('/premium-user', checkJwt, async (req, res) => {
 
         console.log(`[Debug] Final isPremium determination for ${email}: ${isPremium}`);
 
+        // Guard: if the API says premium, verify premiumUntil hasn't passed
+        if (isPremium) {
+            const userRecord = await dynamo.send(new GetCommand({
+                TableName: DYNAMODB_TABLE_NAME,
+                Key: { cognitoUsername: req.userId, email },
+            }));
+            const premiumUntil = userRecord.Item?.premiumUntil;
+            if (premiumUntil && new Date(premiumUntil) < new Date()) {
+                console.log(`[Expiry] User ${req.userId} premiumUntil ${premiumUntil} has passed — downgrading`);
+                await downgradeUser(req.userId, email, 'expired');
+                return res.send({ isPremium: false, details: { subscriptionStatus: 'expired' } });
+            }
+        }
+
         res.send({
             isPremium: isPremium,
             details: data.details || data
@@ -352,6 +378,96 @@ app.get('/premium-user', checkJwt, async (req, res) => {
     } catch (error) {
         console.error('Error fetching premium status via API Gateway:', error);
         res.status(500).send({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Apple App Store Server Notifications V2
+// Apple sends a signed JWT (JWS). We decode the payload without full cert verification
+// since this endpoint can only downgrade users, never grant access.
+app.post('/apple-notifications', async (req, res) => {
+    try {
+        const { signedPayload } = req.body;
+        if (!signedPayload) return res.status(400).json({ error: { message: 'Missing signedPayload' } });
+
+        const payloadBase64 = signedPayload.split('.')[1];
+        const notification = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString('utf8'));
+        const { notificationTypeV2, data } = notification;
+        console.log(`[Apple Notification] Type: ${notificationTypeV2}`);
+
+        const DOWNGRADE_TYPES = ['EXPIRED', 'DID_FAIL_TO_RENEW', 'GRACE_PERIOD_EXPIRED', 'REVOKE'];
+        if (!DOWNGRADE_TYPES.includes(notificationTypeV2)) {
+            return res.status(200).json({ received: true });
+        }
+
+        const txBase64 = data?.signedTransactionInfo?.split('.')[1];
+        if (!txBase64) return res.status(400).json({ error: { message: 'Missing signedTransactionInfo' } });
+
+        const txInfo = JSON.parse(Buffer.from(txBase64, 'base64url').toString('utf8'));
+        const originalTransactionId = txInfo.originalTransactionId;
+        console.log(`[Apple Notification] originalTransactionId: ${originalTransactionId}`);
+
+        const scanResult = await dynamo.send(new ScanCommand({
+            TableName: DYNAMODB_TABLE_NAME,
+            FilterExpression: 'appleOriginalTransactionId = :txId',
+            ExpressionAttributeValues: { ':txId': originalTransactionId },
+        }));
+
+        const user = scanResult.Items?.[0];
+        if (!user) {
+            console.warn(`[Apple Notification] No user found for originalTransactionId ${originalTransactionId}`);
+            return res.status(200).json({ received: true });
+        }
+
+        await downgradeUser(user.cognitoUsername, user.email, notificationTypeV2.toLowerCase());
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('[Apple Notification] Error:', error);
+        res.status(500).json({ error: { message: error.message } });
+    }
+});
+
+// Google Play Developer Notifications (Cloud Pub/Sub push)
+// Google wraps the notification in: { message: { data: "<base64 JSON>" }, subscription: "..." }
+app.post('/google-notifications', async (req, res) => {
+    try {
+        const messageData = req.body?.message?.data;
+        if (!messageData) return res.status(400).json({ error: { message: 'Missing message.data' } });
+
+        const notification = JSON.parse(Buffer.from(messageData, 'base64').toString('utf8'));
+        const subNotif = notification.subscriptionNotification;
+
+        if (!subNotif) {
+            return res.status(200).json({ received: true }); // testNotification or non-subscription event
+        }
+
+        const { notificationType, purchaseToken } = subNotif;
+        console.log(`[Google Notification] Type: ${notificationType}`);
+
+        // 3=CANCELED, 5=ON_HOLD, 12=REVOKED, 13=EXPIRED
+        const DOWNGRADE_TYPES = [3, 5, 12, 13];
+        if (!DOWNGRADE_TYPES.includes(notificationType)) {
+            return res.status(200).json({ received: true });
+        }
+
+        const scanResult = await dynamo.send(new ScanCommand({
+            TableName: DYNAMODB_TABLE_NAME,
+            FilterExpression: 'googlePurchaseToken = :token',
+            ExpressionAttributeValues: { ':token': purchaseToken },
+        }));
+
+        const user = scanResult.Items?.[0];
+        if (!user) {
+            console.warn(`[Google Notification] No user found for purchaseToken`);
+            return res.status(200).json({ received: true }); // 200 so PubSub doesn't retry
+        }
+
+        const reasonMap = { 3: 'canceled', 5: 'on_hold', 12: 'revoked', 13: 'expired' };
+        await downgradeUser(user.cognitoUsername, user.email, reasonMap[notificationType]);
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('[Google Notification] Error:', error);
+        res.status(500).json({ error: { message: error.message } });
     }
 });
 

@@ -58,6 +58,15 @@ const SettingsTab = ({ currency, onCurrencyChange }) => {
   };
 
   const handleDeleteAccount = async () => {
+    if (status === 'active') {
+      setDeleteModalVisible(false);
+      Alert.alert(
+        'Active Subscription',
+        'You must cancel your subscription before deleting your account. Please cancel through the App Store or Google Play, then return to delete your account.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     setDeleteLoading(true);
     try {
       await AsyncStorage.clear();
@@ -479,14 +488,16 @@ const styles = StyleSheet.create({
     color: '#FFCC00',
   },
   unsubscribeSection: {
-    marginTop: 10,
+    marginTop: 0,
     alignItems: 'center',
   },
   unsubscribeText: {
     color: '#32CD32',
-    fontSize: 12,
-    opacity: 0.4,
+    fontSize: 20,
+    opacity: 0.75,
     textDecorationLine: 'underline',
+    paddingVertical: 3,
+    paddingHorizontal: 9,
   },
 
   // ── Theme picker styles ──

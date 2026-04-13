@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Pla
 import * as RNIap from 'react-native-iap';
 import { useSubscription } from '../context/SubscriptionContext';
 
-const IOS_PRODUCT_ID = process.env.EXPO_PUBLIC_IAP_PRODUCT_ID || 'com.loxodonta.gripah.premium.monthly';
+const IOS_PRODUCT_ID = process.env.EXPO_PUBLIC_IAP_PRODUCT_ID || 'com.loxodonta.gripah.premium.monthlypro';
 const ANDROID_PRODUCT_ID = process.env.EXPO_PUBLIC_ANDROID_IAP_PRODUCT_ID || IOS_PRODUCT_ID;
 const PRODUCT_ID = Platform.OS === 'android' ? ANDROID_PRODUCT_ID : IOS_PRODUCT_ID;
 

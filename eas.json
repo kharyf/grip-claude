@@ -9,7 +9,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthlypro",
         "EXPO_PUBLIC_API_URL": "https://gr-f1dda9023cb9481db8f60033be624a9b.ecs.us-east-1.on.aws",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_ep4c0DVRU",
@@ -23,7 +23,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthlypro",
         "EXPO_PUBLIC_API_URL": "https://gripahserver-98886831409.us-west1.run.app",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_ep4c0DVRU",
@@ -44,8 +44,8 @@
       "autoIncrement": true,
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthly",
-        "EXPO_PUBLIC_API_URL": "https://gripahliveserver-98886831409.us-east1.run.app",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.loxodonta.gripah.premium.monthlypro",
+        "EXPO_PUBLIC_API_URL": "https://gripahliveserver-98886831409.us-west1.run.app",
         "EXPO_PUBLIC_API_STAGE_URL": "https://c9wsya0ga2.execute-api.us-east-1.amazonaws.com/GripahLiveAPIStage",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_ID": "us-east-1_2AcU6ibG2",
         "EXPO_PUBLIC_AMPLIFY_USER_POOL_CLIENT_ID": "39gjubt1pl19j2vj9iv74ku396",
