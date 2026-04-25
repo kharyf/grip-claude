@@ -2,93 +2,59 @@ const envFile = process.env.SERVER_ENV ? `.env.${process.env.SERVER_ENV}` : '.en
 require('dotenv').config({ path: envFile });
 const express = require('express');
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, UpdateCommand, GetCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
-const { STSClient, AssumeRoleWithWebIdentityCommand } = require("@aws-sdk/client-sts");
+const oracledb = require('oracledb');
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
 const cors = require('cors');
 
 const app = express();
 
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
-const DYNAMODB_TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || "GripahTestUsersTable";
-
 // API Gateway configuration
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || "https://c0kjvdp5l5.execute-api.us-east-1.amazonaws.com/GripahAPIStage";
 
-// ── Cross-cloud credential provider (GCP Workload Identity → AWS STS) ─────────
-// Fetches an OIDC token from the GCP metadata server (only available inside Cloud Run/GCE).
-async function fetchGcpOidcToken(audience) {
-    const url = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`;
-    const response = await fetch(url, { headers: { 'Metadata-Flavor': 'Google' } });
-    if (!response.ok) throw new Error(`GCP metadata server returned ${response.status}`);
-    return response.text();
-}
-
-let cachedCredentials = null;
-let credentialExpiry = 0;
-
-// Returns temporary AWS credentials by exchanging the GCP OIDC token with STS.
-// Caches credentials and refreshes them 5 minutes before expiry.
-// If AWS_ROLE_ARN is not set (local dev), returns undefined so the SDK uses ~/.aws.
-async function getAwsCredentials() {
-    const roleArn = process.env.AWS_ROLE_ARN;
-    const audience = process.env.GCP_TOKEN_AUDIENCE || 'gripah-aws-access';
-
-    if (!roleArn) return undefined;
-
-    if (cachedCredentials && Date.now() < credentialExpiry - 5 * 60 * 1000) {
-        return cachedCredentials;
-    }
-
-    try {
-        const webIdentityToken = await fetchGcpOidcToken(audience);
-        const stsClient = new STSClient({ region: AWS_REGION });
-        const { Credentials } = await stsClient.send(new AssumeRoleWithWebIdentityCommand({
-            RoleArn: roleArn,
-            RoleSessionName: 'GripahCloudRunSession',
-            WebIdentityToken: webIdentityToken,
-            DurationSeconds: 3600,
-        }));
-
-        cachedCredentials = {
-            accessKeyId: Credentials.AccessKeyId,
-            secretAccessKey: Credentials.SecretAccessKey,
-            sessionToken: Credentials.SessionToken,
-        };
-        credentialExpiry = Credentials.Expiration.getTime();
-        console.log(`[AWS] Assumed role ${roleArn}, credentials valid until ${Credentials.Expiration}`);
-        return cachedCredentials;
-    } catch (err) {
-        console.error('[AWS] STS credential exchange failed, falling back to env vars:', err.message);
-        return undefined;
-    }
-}
-
-// SDK clients — initialized in init() after credentials are fetched
+// SDK clients — initialized in init()
 let secretsClient;
-let dynamo;
+let dbPool;
 
-async function initAwsClients() {
-    const credentials = await getAwsCredentials();
-    const config = { region: AWS_REGION, ...(credentials && { credentials }) };
+async function initClients() {
+    // Secrets Manager uses static IAM credentials from env vars
+    secretsClient = new SecretsManagerClient({
+        region: AWS_REGION,
+        credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        },
+    });
 
-    secretsClient = new SecretsManagerClient(config);
-
-    const dynamoClient = new DynamoDBClient(config);
-    dynamo = DynamoDBDocumentClient.from(dynamoClient);
-    console.log('[AWS] SDK clients initialized');
+    // Oracle ATP connection pool (thin mode — no Oracle Instant Client required)
+    oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
+    dbPool = await oracledb.createPool({
+        user: process.env.ORACLE_DB_USER,
+        password: process.env.ORACLE_DB_PASSWORD,
+        connectString: process.env.ORACLE_DB_CONNECT_STRING,
+        walletLocation: process.env.ORACLE_WALLET_DIR,
+        walletPassword: process.env.ORACLE_WALLET_PASSWORD,
+        poolMin: 2,
+        poolMax: 10,
+        poolIncrement: 1,
+    });
+    console.log('[Oracle] Connection pool created');
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function downgradeUser(cognitoUsername, email, reason) {
-    await dynamo.send(new UpdateCommand({
-        TableName: DYNAMODB_TABLE_NAME,
-        Key: { cognitoUsername, email },
-        UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status',
-        ExpressionAttributeValues: { ':premium': false, ':status': reason },
-    }));
-    console.log(`DynamoDB: user ${cognitoUsername} downgraded (reason: ${reason})`);
+    const conn = await dbPool.getConnection();
+    try {
+        await conn.execute(
+            `UPDATE gripah_users
+             SET premium_user = 0, subscription_status = :status
+             WHERE cognito_username = :username AND email = :email`,
+            { status: reason, username: cognitoUsername, email },
+            { autoCommit: true }
+        );
+        console.log(`Oracle: user ${cognitoUsername} downgraded (reason: ${reason})`);
+    } finally {
+        await conn.close();
+    }
 }
 
 async function getSecret(secretName) {
@@ -221,18 +187,31 @@ app.post('/verify-apple-iap', checkJwt, async (req, res) => {
         // expires_date_ms may be absent on a fresh in_app entry; fall forward 30 days as a safe default
         const expiresMs = parseInt(activeSubscription.expires_date_ms) || (now + 30 * 24 * 60 * 60 * 1000);
         const premiumUntil = new Date(expiresMs).toISOString();
-        await dynamo.send(new UpdateCommand({
-            TableName: DYNAMODB_TABLE_NAME,
-            Key: { cognitoUsername: cognitoId, email: req.user.email },
-            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until, appleOriginalTransactionId = :txId',
-            ExpressionAttributeValues: {
-                ':premium': true,
-                ':status': 'active',
-                ':until': premiumUntil,
-                ':txId': activeSubscription.original_transaction_id || '',
-            },
-        }));
-        console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
+        const conn = await dbPool.getConnection();
+        try {
+            await conn.execute(
+                `MERGE INTO gripah_users u USING DUAL
+                 ON (u.cognito_username = :username AND u.email = :email)
+                 WHEN MATCHED THEN UPDATE SET
+                     premium_user = 1, subscription_status = 'active',
+                     premium_until = TO_TIMESTAMP_TZ(:until, 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
+                     apple_original_tx_id = :txId
+                 WHEN NOT MATCHED THEN INSERT
+                     (cognito_username, email, premium_user, subscription_status, premium_until, apple_original_tx_id)
+                 VALUES (:username, :email, 1, 'active',
+                     TO_TIMESTAMP_TZ(:until, 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'), :txId)`,
+                {
+                    username: cognitoId,
+                    email: req.user.email,
+                    until: premiumUntil,
+                    txId: activeSubscription.original_transaction_id || '',
+                },
+                { autoCommit: true }
+            );
+        } finally {
+            await conn.close();
+        }
+        console.log(`Oracle updated: user ${cognitoId} is now premium until ${premiumUntil}`);
 
         res.json({ success: true, expiresDate: activeSubscription.expires_date });
     } catch (error) {
@@ -289,18 +268,31 @@ app.post('/verify-google-iap', checkJwt, async (req, res) => {
         const premiumUntil = new Date(expiryTimeMs).toISOString();
         console.log(`Google Play IAP verified for user ${cognitoId}, product: ${productId}, expires: ${premiumUntil}`);
 
-        await dynamo.send(new UpdateCommand({
-            TableName: DYNAMODB_TABLE_NAME,
-            Key: { cognitoUsername: cognitoId, email: req.user.email },
-            UpdateExpression: 'SET premiumUser = :premium, subscriptionStatus = :status, premiumUntil = :until, googlePurchaseToken = :token',
-            ExpressionAttributeValues: {
-                ':premium': true,
-                ':status': 'active',
-                ':until': premiumUntil,
-                ':token': purchaseToken,
-            },
-        }));
-        console.log(`DynamoDB updated: user ${cognitoId} is now premium until ${premiumUntil}`);
+        const conn = await dbPool.getConnection();
+        try {
+            await conn.execute(
+                `MERGE INTO gripah_users u USING DUAL
+                 ON (u.cognito_username = :username AND u.email = :email)
+                 WHEN MATCHED THEN UPDATE SET
+                     premium_user = 1, subscription_status = 'active',
+                     premium_until = TO_TIMESTAMP_TZ(:until, 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),
+                     google_purchase_token = :token
+                 WHEN NOT MATCHED THEN INSERT
+                     (cognito_username, email, premium_user, subscription_status, premium_until, google_purchase_token)
+                 VALUES (:username, :email, 1, 'active',
+                     TO_TIMESTAMP_TZ(:until, 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'), :token)`,
+                {
+                    username: cognitoId,
+                    email: req.user.email,
+                    until: premiumUntil,
+                    token: purchaseToken,
+                },
+                { autoCommit: true }
+            );
+        } finally {
+            await conn.close();
+        }
+        console.log(`Oracle updated: user ${cognitoId} is now premium until ${premiumUntil}`);
 
         res.json({ success: true, expiresDate: premiumUntil });
     } catch (error) {
@@ -358,11 +350,18 @@ app.get('/premium-user', checkJwt, async (req, res) => {
 
         // Guard: if the API says premium, verify premiumUntil hasn't passed
         if (isPremium) {
-            const userRecord = await dynamo.send(new GetCommand({
-                TableName: DYNAMODB_TABLE_NAME,
-                Key: { cognitoUsername: req.userId, email },
-            }));
-            const premiumUntil = userRecord.Item?.premiumUntil;
+            const conn = await dbPool.getConnection();
+            let premiumUntil;
+            try {
+                const result = await conn.execute(
+                    `SELECT premium_until FROM gripah_users
+                     WHERE cognito_username = :username AND email = :email`,
+                    { username: req.userId, email }
+                );
+                premiumUntil = result.rows[0]?.PREMIUM_UNTIL?.toISOString();
+            } finally {
+                await conn.close();
+            }
             if (premiumUntil && new Date(premiumUntil) < new Date()) {
                 console.log(`[Expiry] User ${req.userId} premiumUntil ${premiumUntil} has passed — downgrading`);
                 await downgradeUser(req.userId, email, 'expired');
@@ -407,13 +406,23 @@ app.post('/apple-notifications', async (req, res) => {
         const originalTransactionId = txInfo.originalTransactionId;
         console.log(`[Apple Notification] originalTransactionId: ${originalTransactionId}`);
 
-        const scanResult = await dynamo.send(new ScanCommand({
-            TableName: DYNAMODB_TABLE_NAME,
-            FilterExpression: 'appleOriginalTransactionId = :txId',
-            ExpressionAttributeValues: { ':txId': originalTransactionId },
-        }));
-
-        const user = scanResult.Items?.[0];
+        const conn1 = await dbPool.getConnection();
+        let user;
+        try {
+            const result = await conn1.execute(
+                `SELECT cognito_username, email FROM gripah_users
+                 WHERE apple_original_tx_id = :txId`,
+                { txId: originalTransactionId }
+            );
+            if (result.rows.length > 0) {
+                user = {
+                    cognitoUsername: result.rows[0].COGNITO_USERNAME,
+                    email: result.rows[0].EMAIL,
+                };
+            }
+        } finally {
+            await conn1.close();
+        }
         if (!user) {
             console.warn(`[Apple Notification] No user found for originalTransactionId ${originalTransactionId}`);
             return res.status(200).json({ received: true });
@@ -450,13 +459,23 @@ app.post('/google-notifications', async (req, res) => {
             return res.status(200).json({ received: true });
         }
 
-        const scanResult = await dynamo.send(new ScanCommand({
-            TableName: DYNAMODB_TABLE_NAME,
-            FilterExpression: 'googlePurchaseToken = :token',
-            ExpressionAttributeValues: { ':token': purchaseToken },
-        }));
-
-        const user = scanResult.Items?.[0];
+        const conn2 = await dbPool.getConnection();
+        let user;
+        try {
+            const result = await conn2.execute(
+                `SELECT cognito_username, email FROM gripah_users
+                 WHERE google_purchase_token = :token`,
+                { token: purchaseToken }
+            );
+            if (result.rows.length > 0) {
+                user = {
+                    cognitoUsername: result.rows[0].COGNITO_USERNAME,
+                    email: result.rows[0].EMAIL,
+                };
+            }
+        } finally {
+            await conn2.close();
+        }
         if (!user) {
             console.warn(`[Google Notification] No user found for purchaseToken`);
             return res.status(200).json({ received: true }); // 200 so PubSub doesn't retry
@@ -485,7 +504,7 @@ app.use((err, req, res, next) => {
 // Initialize and start server
 async function init() {
     try {
-        await initAwsClients();
+        await initClients();
 
         const PORT = process.env.PORT || 3000;
         const server = app.listen(PORT, () => {
@@ -493,10 +512,11 @@ async function init() {
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
         });
 
-        // Graceful shutdown handling for Fargate
+        // Graceful shutdown handling
         process.on('SIGTERM', () => {
             console.log('SIGTERM signal received: closing HTTP server');
-            server.close(() => {
+            server.close(async () => {
+                await dbPool.close(10);
                 console.log('HTTP server closed');
                 process.exit(0);
             });

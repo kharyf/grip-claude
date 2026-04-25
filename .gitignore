@@ -1,9 +1,11 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Special Ignores
 .npm-cache/
 server/.npm-cache-local/
 server/AWSCLIV2.pkg
 /inspect-ios
+INFRASTRUCTURE_WALKTHROUGH.md
 
 # dependencies
 node_modules/
@@ -40,6 +42,12 @@ yarn-error.*
 # local env files
 *.env
 .env*.local
+server/.env.preview
+server/.env.production
+
+# Oracle connection wallets
+walletForTest/
+walletForLive/
 
 # typescript
 *.tsbuildinfo

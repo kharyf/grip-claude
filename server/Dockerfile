@@ -11,9 +11,8 @@ RUN npm ci --omit=dev
 # Copy server source code
 COPY . .
 
-# Expose the port (defaulting to 80 for Fargate health checks)
+# PORT defaults to 80; SERVER_ENV must be supplied at runtime via --env-file
 ENV PORT=80
-ENV SERVER_ENV=production
 EXPOSE 80
 
 # Start the server (runs as root to bind to port 80)

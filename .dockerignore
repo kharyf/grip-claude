@@ -33,6 +33,12 @@ expo-env.d.ts
 # Environment files
 .env
 .env*.local
+server/.env.preview
+server/.env.production
+
+# Oracle connection wallets
+walletForTest/
+walletForLive/
 
 # TypeScript
 *.tsbuildinfo
